@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "multimodel-policy-mgmt-backend"
+version = "0.1.0"
+description = "FastAPI backend for Multimodel Policy Management"
+requires-python = ">=3.12"
+readme = { text = "Backend service for Multimodel Policy Management (see repository root README and constitution)." }
+keywords = ["fastapi", "policy", "backend", "monorepo"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Framework :: FastAPI",
+  "License :: OSI Approved :: MIT License"
+]
+
+# Application and tooling dependencies
+# Note: ruff and pytest are included here for simplicity in this monorepo; they can be moved to dev extras later.
+dependencies = [
+  "fastapi>=0.111.0",
+  "uvicorn[standard]>=0.30.0",
+  "pydantic-settings>=2.3.0",
+  "sqlalchemy>=2.0.29",
+  "alembic>=1.13.2",
+  "httpx>=0.27.0",
+  "pytest>=8.3.0",
+  "ruff>=0.6.0",
+]
+
+[project.urls]
+Homepage = "https://example.com"
+Repository = "https://example.com/repo"
+
+[tool.ruff]
+# Target Python version and basic formatting
+target-version = "py312"
+line-length = 100
+extend-exclude = [".venv", "migrations", "alembic"]
+
+[tool.ruff.lint]
+# Enable common rule sets
+select = ["E", "F", "I", "UP", "B", "PL"]
+ignore = ["E501"]  # line length handled by formatter
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
+pythonpath = ["app"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
