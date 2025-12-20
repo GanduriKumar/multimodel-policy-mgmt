@@ -33,6 +33,12 @@ class Tenant(Base):
     # URL-safe slug (unique and indexed)
     slug: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
 
+    # Optional API key hash (HMAC-SHA256 hex, 64 chars). Kept nullable to avoid breaking
+    # existing rows/tests; UNIQUE ensures one tenant per key when populated.
+    api_key_hash: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, unique=True, index=True
+    )
+
     # Optional description
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
