@@ -16,8 +16,10 @@ from sqlalchemy import (
     JSON,
     UniqueConstraint,
     func,
+    text,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
+from sqlalchemy.ext.mutable import MutableList
 
 from app.db.base import Base
 
@@ -64,11 +66,11 @@ class DecisionLog(Base):
 
     # Decision outcome
     allowed: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False, server_default="0"
+        Boolean, nullable=False, default=False, server_default=text("false")
     )
 
     # Explainability: reasons that led to the decision (e.g., ["blocked_term:x", "missing_evidence:url"])
-    reasons: Mapped[list[str] | None] = mapped_column(JSON, nullable=True, default=list)
+    reasons: Mapped[list[str] | None] = mapped_column(MutableList.as_mutable(JSON), nullable=True, default=list)
 
     # Optional numeric risk score associated with this decision (0-100 typical)
     risk_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -82,10 +84,14 @@ class DecisionLog(Base):
     )
 
     # Relationships
-    tenant = relationship("Tenant", backref="decision_logs")
-    request_log = relationship("RequestLog", backref="decision_logs")
-    policy = relationship("Policy", backref="decision_logs")
-    policy_version = relationship("PolicyVersion", backref="decision_logs")
+    tenant: Mapped["Tenant"] = relationship("Tenant", backref=backref("decision_logs", passive_deletes=True))
+    request_log: Mapped["RequestLog"] = relationship(
+        "RequestLog", backref=backref("decision_logs", passive_deletes=True)
+    )
+    policy: Mapped["Policy"] = relationship("Policy", backref=backref("decision_logs", passive_deletes=True))
+    policy_version: Mapped["PolicyVersion"] = relationship(
+        "PolicyVersion", backref=backref("decision_logs", passive_deletes=True)
+    )
 
     def __repr__(self) -> str:
         return (

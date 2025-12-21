@@ -7,8 +7,11 @@ CLI to evaluate a policy against input text.
 - Prints JSON with fields: {"allowed": bool, "reasons": [str, ...]}.
 
 Usage examples:
+  # Positional argument (backward compatible)
   type input.txt | python -m app.tools.run_policy path/to/policy.json
-  echo "some text" | python -m app.tools.run_policy policy.json
+
+  # Named option (matches README)
+  echo "some text" | python -m app.tools.run_policy --policy policy.json
 """
 
 from __future__ import annotations
@@ -17,7 +20,6 @@ import argparse
 import json
 import os
 import sys
-from typing import Tuple, List
 
 # Ensure the 'backend' directory is on sys.path so we can import app modules
 CURRENT_DIR = os.path.dirname(__file__)
@@ -31,14 +33,21 @@ from app.services.policy_engine import evaluate_policy  # noqa: E402
 
 def _parse_args() -> argparse.Namespace:
     """
-    Parse CLI arguments.
+    Parse CLI arguments (supports positional path or --policy/-p).
     """
     parser = argparse.ArgumentParser(
         description="Evaluate a policy JSON against input text from STDIN and print JSON result."
     )
     parser.add_argument(
         "policy_path",
+        nargs="?",
         help="Path to the policy JSON file.",
+    )
+    parser.add_argument(
+        "--policy",
+        "-p",
+        dest="policy_path_flag",
+        help="Path to the policy JSON file (named option).",
     )
     return parser.parse_args()
 
@@ -69,7 +78,10 @@ def main() -> int:
     """
     args = _parse_args()
     try:
-        policy = _load_policy(args.policy_path)
+        policy_path = args.policy_path_flag or args.policy_path
+        if not policy_path:
+            raise ValueError("Missing policy path. Provide a positional path or use --policy/-p PATH.")
+        policy = _load_policy(policy_path)
         input_text = _read_stdin()
 
         # Evidence types are not provided via CLI in this version; use empty set

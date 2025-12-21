@@ -2,8 +2,12 @@
 FastAPI application entrypoint.
 
 - Configures CORS.
-- Registers a basic API router.
-- Avoids business logic (infrastructure only).
+- Registers standardized error handlers.
+- Initializes structured logging.
+- Includes infra routes (health/version) and aggregates API sub-routers.
+
+Run locally:
+  uvicorn app.main:app --reload --port 8000
 """
 
 from __future__ import annotations
@@ -11,8 +15,12 @@ from __future__ import annotations
 import os
 from typing import List
 
-from fastapi import FastAPI, APIRouter
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from app.core.errors import register_exception_handlers
+from app.core.logging import init_logging
+from app.api.router import router as api_router
 
 
 def _create_cors_origins() -> List[str]:
@@ -27,7 +35,7 @@ def _create_cors_origins() -> List[str]:
     return [o.strip() for o in raw.split(",") if o.strip()]
 
 
-def _create_router() -> APIRouter:
+def _create_infra_router() -> APIRouter:
     """
     Create a minimal API router with non-business endpoints (health, version).
     """
@@ -48,11 +56,18 @@ def _create_router() -> APIRouter:
 
 def get_application() -> FastAPI:
     """
-    Construct the FastAPI app with CORS and router.
+    Construct the FastAPI app with CORS, logging, routers, and error handlers.
     """
+    # Initialize structured logging early (idempotent)
+    try:
+        init_logging()
+    except Exception:
+        # Logging initialization failures should not prevent app startup
+        pass
+
     app = FastAPI(title="Policy Management API", version=os.getenv("APP_VERSION", "0.1.0"))
 
-    # Configure CORS (beginner-friendly defaults; can be tightened via env)
+    # Configure CORS (defaults; can be tightened via env)
     origins = _create_cors_origins()
     app.add_middleware(
         CORSMiddleware,
@@ -62,8 +77,12 @@ def get_application() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Include router (no business logic)
-    app.include_router(_create_router())
+    # Include infra and aggregated API routers
+    app.include_router(_create_infra_router())
+    app.include_router(api_router)
+
+    # Register standardized error handlers
+    register_exception_handlers(app)
 
     # Optional root route (informational only)
     @app.get("/")

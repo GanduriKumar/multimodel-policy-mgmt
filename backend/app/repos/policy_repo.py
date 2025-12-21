@@ -1,25 +1,26 @@
 """
-SQLAlchemy-based Policy repository implementation.
+SQLAlchemy-based Policy repository.
 
-Implements core operations:
-- create_policy
-- list_policies
-- add_version
-- activate_version (ensures only one active version per policy)
-- get_active_policy_doc (returns the active version's document as dict)
-
-This repository expects a SQLAlchemy Session to be provided by the caller.
+Implements policy and version CRUD aligned with the PolicyRepo Protocol:
+- get_by_slug, list_policies, create_policy, update_policy
+- add_version (auto-increment), set_active_version (deactivate others)
+- get_active_version, get_version, list_versions
+- convenience: get_policy_by_id, get_active_policy_doc
 """
 
 from __future__ import annotations
 
-from typing import List, Optional, Sequence
+from typing import Optional, Sequence
 
-from sqlalchemy import func, select, update
+from sqlalchemy import select, func, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.policy import Policy
 from app.models.policy_version import PolicyVersion
+
+
+__all__ = ["SqlAlchemyPolicyRepo"]
 
 
 class SqlAlchemyPolicyRepo:
@@ -33,8 +34,32 @@ class SqlAlchemyPolicyRepo:
         self.session = session
 
     # -------------------------------
-    # Policies
+    # Policy operations
     # -------------------------------
+
+    def get_policy_by_id(self, policy_id: int) -> Optional[Policy]:
+        stmt = select(Policy).where(Policy.id == policy_id)
+        return self.session.execute(stmt).scalars().first()
+
+    def get_by_slug(self, tenant_id: int, slug: str) -> Optional[Policy]:
+        if not isinstance(tenant_id, int):
+            raise TypeError("tenant_id must be an int")
+        if not isinstance(slug, str) or not slug.strip():
+            raise ValueError("slug must be a non-empty string")
+        stmt = select(Policy).where(Policy.tenant_id == tenant_id, Policy.slug == slug.strip())
+        return self.session.execute(stmt).scalars().first()
+
+    def list_policies(self, tenant_id: int, offset: int = 0, limit: int = 50) -> Sequence[Policy]:
+        if not isinstance(tenant_id, int):
+            raise TypeError("tenant_id must be an int")
+        stmt = (
+            select(Policy)
+            .where(Policy.tenant_id == tenant_id)
+            .order_by(Policy.created_at.desc())
+            .offset(max(0, int(offset)))
+            .limit(max(1, int(limit)))
+        )
+        return list(self.session.execute(stmt).scalars().all())
 
     def create_policy(
         self,
@@ -47,119 +72,162 @@ class SqlAlchemyPolicyRepo:
         """
         Create and persist a new Policy.
         """
+        if not isinstance(tenant_id, int):
+            raise TypeError("tenant_id must be an int")
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("name must be a non-empty string")
+        if not isinstance(slug, str) or not slug.strip():
+            raise ValueError("slug must be a non-empty string")
+
         policy = Policy(
             tenant_id=tenant_id,
-            name=name,
-            slug=slug,
+            name=name.strip(),
+            slug=slug.strip(),
             description=description,
-            is_active=is_active,
+            is_active=bool(is_active),
         )
         self.session.add(policy)
-        self.session.commit()
+        try:
+            self.session.commit()
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise ValueError("Policy creation failed due to uniqueness constraint") from exc
         self.session.refresh(policy)
         return policy
 
-    def list_policies(self, tenant_id: int, offset: int = 0, limit: int = 50) -> Sequence[Policy]:
+    def update_policy(
+        self,
+        policy_id: int,
+        *,
+        name: Optional[str] = None,
+        slug: Optional[str] = None,
+        description: Optional[str] = None,
+        is_active: Optional[bool] = None,
+    ) -> Policy:
         """
-        List policies for a tenant with pagination.
+        Update mutable fields on a Policy.
         """
-        stmt = (
-            select(Policy)
-            .where(Policy.tenant_id == tenant_id)
-            .order_by(Policy.created_at.desc())
-            .offset(max(0, offset))
-            .limit(max(1, limit))
-        )
-        return list(self.session.execute(stmt).scalars().all())
+        policy = self.get_policy_by_id(policy_id)
+        if policy is None:
+            raise ValueError("Policy not found")
+
+        if name is not None:
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("name must be a non-empty string")
+            policy.name = name.strip()
+        if slug is not None:
+            if not isinstance(slug, str) or not slug.strip():
+                raise ValueError("slug must be a non-empty string")
+            policy.slug = slug.strip()
+        if description is not None:
+            policy.description = description
+        if is_active is not None:
+            policy.is_active = bool(is_active)
+
+        try:
+            self.session.commit()
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise ValueError("Policy update failed due to uniqueness constraint") from exc
+        self.session.refresh(policy)
+        return policy
 
     # -------------------------------
-    # Policy Versions
+    # Version operations
     # -------------------------------
+
+    def _next_version_number(self, policy_id: int) -> int:
+        stmt = select(func.max(PolicyVersion.version)).where(PolicyVersion.policy_id == policy_id)
+        current_max = self.session.execute(stmt).scalar()
+        return int(current_max or 0) + 1
 
     def add_version(self, policy_id: int, document: dict, is_active: bool = True) -> PolicyVersion:
         """
-        Create a new PolicyVersion for the given policy.
-        - Version number is assigned as (max existing + 1), starting at 1.
-        - If is_active is True, marks all other versions inactive.
+        Create a new policy version with auto-incremented version number.
+        Optionally mark it active (deactivates others for this policy).
         """
-        # Ensure policy exists
-        policy = self.session.get(Policy, policy_id)
+        if not isinstance(document, dict):
+            raise ValueError("document must be a dict")
+        policy = self.get_policy_by_id(policy_id)
         if policy is None:
-            raise ValueError(f"Policy id={policy_id} not found")
+            raise ValueError("Policy not found")
 
-        # Determine next version number
-        max_stmt = select(func.max(PolicyVersion.version)).where(PolicyVersion.policy_id == policy_id)
-        current_max = self.session.execute(max_stmt).scalar()
-        next_version = int(current_max or 0) + 1
+        next_ver = self._next_version_number(policy_id)
+        pv = PolicyVersion(policy_id=policy_id, version=next_ver, document=dict(document), is_active=bool(is_active))
+        self.session.add(pv)
 
-        # Optionally deactivate existing versions
         if is_active:
+            # Deactivate other versions for the policy in one statement; the new row is not yet committed
+            self.session.flush()
             self.session.execute(
                 update(PolicyVersion)
-                .where(PolicyVersion.policy_id == policy_id, PolicyVersion.is_active.is_(True))
+                .where(PolicyVersion.policy_id == policy_id, PolicyVersion.id != pv.id)
                 .values(is_active=False)
             )
 
-        pv = PolicyVersion(
-            policy_id=policy_id,
-            version=next_version,
-            document=document,
-            is_active=is_active,
-        )
-        self.session.add(pv)
         self.session.commit()
         self.session.refresh(pv)
         return pv
 
-    def activate_version(self, policy_id: int, version: int) -> PolicyVersion:
+    def set_active_version(self, policy_id: int, version: int) -> PolicyVersion:
         """
-        Activate a specific version for the given policy.
-        Ensures all other versions are deactivated.
+        Set the specified version as active and deactivate all other versions for that policy.
         """
-        # Lookup target version
-        stmt = select(PolicyVersion).where(
-            PolicyVersion.policy_id == policy_id, PolicyVersion.version == version
-        )
-        target = self.session.execute(stmt).scalars().first()
-        if target is None:
-            raise ValueError(f"PolicyVersion policy_id={policy_id} version={version} not found")
+        pv = self.get_version(policy_id, version)
+        if pv is None:
+            raise ValueError("Policy version not found")
 
-        # Deactivate others, activate target
+        # Activate selected
+        pv.is_active = True
+        self.session.flush()
+
+        # Deactivate others
         self.session.execute(
             update(PolicyVersion)
-            .where(PolicyVersion.policy_id == policy_id, PolicyVersion.id != target.id)
+            .where(PolicyVersion.policy_id == policy_id, PolicyVersion.id != pv.id)
             .values(is_active=False)
         )
-        self.session.execute(
-            update(PolicyVersion)
-            .where(PolicyVersion.id == target.id)
-            .values(is_active=True)
-        )
+
         self.session.commit()
-        # Refresh and return
-        self.session.refresh(target)
-        return target
+        self.session.refresh(pv)
+        return pv
+
+    # Backward-compatible alias used by tests/fakes
+    def activate_version(self, policy_id: int, version: int) -> PolicyVersion:
+        """Alias for set_active_version to maintain API compatibility."""
+        return self.set_active_version(policy_id, version)
+
+    def get_active_version(self, policy_id: int) -> Optional[PolicyVersion]:
+        stmt = select(PolicyVersion).where(PolicyVersion.policy_id == policy_id, PolicyVersion.is_active.is_(True))
+        return self.session.execute(stmt).scalars().first()
+
+    def get_version(self, policy_id: int, version: int) -> Optional[PolicyVersion]:
+        stmt = select(PolicyVersion).where(
+            PolicyVersion.policy_id == policy_id,
+            PolicyVersion.version == int(version),
+        )
+        return self.session.execute(stmt).scalars().first()
+
+    def list_versions(self, policy_id: int, offset: int = 0, limit: int = 50) -> Sequence[PolicyVersion]:
+        stmt = (
+            select(PolicyVersion)
+            .where(PolicyVersion.policy_id == policy_id)
+            .order_by(PolicyVersion.version.desc())
+            .offset(max(0, int(offset)))
+            .limit(max(1, int(limit)))
+        )
+        return list(self.session.execute(stmt).scalars().all())
 
     # -------------------------------
-    # Accessors
+    # Convenience
     # -------------------------------
 
     def get_active_policy_doc(self, tenant_id: int, policy_slug: str) -> Optional[dict]:
         """
         Return the active policy document (dict) for the tenant's policy slug, or None if not found.
         """
-        # Find policy
-        pol_stmt = select(Policy).where(Policy.tenant_id == tenant_id, Policy.slug == policy_slug)
-        policy = self.session.execute(pol_stmt).scalars().first()
-        if policy is None:
+        pol = self.get_by_slug(tenant_id, policy_slug)
+        if not pol:
             return None
-
-        # Get active version
-        ver_stmt = select(PolicyVersion).where(
-            PolicyVersion.policy_id == policy.id, PolicyVersion.is_active.is_(True)
-        ).order_by(PolicyVersion.version.desc())
-        active = self.session.execute(ver_stmt).scalars().first()
-        if active is None:
-            return None
-
-        return dict(active.document or {})
+        pv = self.get_active_version(pol.id)
+        return dict(pv.document) if pv else None

@@ -14,7 +14,7 @@ Protocols:
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Optional, Protocol, Sequence, runtime_checkable, TYPE_CHECKING
+from typing import Optional, Protocol, Sequence, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     # Imported only for type checking to avoid runtime import cycles
@@ -25,7 +25,6 @@ if TYPE_CHECKING:
     from app.models.request_log import RequestLog
     from app.models.decision_log import DecisionLog
     from app.models.risk_score import RiskScore
-
 
 __all__ = ["TenantRepo", "PolicyRepo", "EvidenceRepo", "AuditRepo"]
 
@@ -40,30 +39,12 @@ class TenantRepo(Protocol):
     Contract for tenant data access.
     """
 
-    # Reads
     def get_by_id(self, tenant_id: int) -> Optional["Tenant"]:
-        """Return a tenant by primary key or None if not found."""
+        """Fetch a tenant by id."""
         raise NotImplementedError()
 
-    def get_by_slug(self, slug: str) -> Optional["Tenant"]:
-        """Return a tenant by slug or None if not found."""
-        raise NotImplementedError()
-
-    def list(self, offset: int = 0, limit: int = 50) -> Sequence["Tenant"]:
-        """Return a paginated list of tenants."""
-        raise NotImplementedError()
-
-    # Writes
-    def create(self, name: str, slug: str, description: Optional[str] = None, is_active: bool = True) -> "Tenant":
-        """Create and return a new tenant."""
-        raise NotImplementedError()
-
-    def update(self, tenant: "Tenant", **fields: Any) -> "Tenant":
-        """Update fields on the tenant and return the updated entity."""
-        raise NotImplementedError()
-
-    def delete(self, tenant: "Tenant") -> None:
-        """Delete the tenant."""
+    def create(self, *, name: str) -> "Tenant":
+        """Create and return a tenant."""
         raise NotImplementedError()
 
 
@@ -77,50 +58,31 @@ class PolicyRepo(Protocol):
     Contract for policy and policy-version data access.
     """
 
-    # Policy reads
-    def get_policy_by_id(self, policy_id: int) -> Optional["Policy"]:
-        """Return a policy by id."""
-        raise NotImplementedError()
-
-    def get_policy_by_slug(self, tenant_id: int, slug: str) -> Optional["Policy"]:
-        """Return a policy within a tenant by slug."""
+    # Policies
+    def get_by_slug(self, tenant_id: int, slug: str) -> Optional["Policy"]:
+        """Fetch policy by tenant+slug."""
         raise NotImplementedError()
 
     def list_policies(self, tenant_id: int, offset: int = 0, limit: int = 50) -> Sequence["Policy"]:
         """List policies for a tenant."""
         raise NotImplementedError()
 
-    # Policy writes
     def create_policy(
-        self,
-        tenant_id: int,
-        name: str,
-        slug: str,
-        description: Optional[str] = None,
-        is_active: bool = True,
+        self, *, tenant_id: int, name: str, slug: str, description: Optional[str] = None, is_active: bool = True
     ) -> "Policy":
-        """Create and return a new policy."""
+        """Create a policy."""
         raise NotImplementedError()
 
-    def update_policy(self, policy: "Policy", **fields: Any) -> "Policy":
-        """Update fields on a policy."""
+    def update_policy(
+        self, policy_id: int, *, name: Optional[str] = None, slug: Optional[str] = None,
+        description: Optional[str] = None, is_active: Optional[bool] = None
+    ) -> "Policy":
+        """Update a policy."""
         raise NotImplementedError()
 
-    def delete_policy(self, policy: "Policy") -> None:
-        """Delete a policy."""
-        raise NotImplementedError()
-
-    # PolicyVersion operations
-    def add_version(self, policy_id: int, document: dict, is_active: bool = True) -> "PolicyVersion":
-        """Create and attach a new version to a policy, optionally marking active."""
-        raise NotImplementedError()
-
-    def get_active_version(self, policy_id: int) -> Optional["PolicyVersion"]:
-        """Return the currently active version for a policy, if any."""
-        raise NotImplementedError()
-
-    def get_version(self, policy_id: int, version: int) -> Optional["PolicyVersion"]:
-        """Return a specific policy version."""
+    # Versions
+    def create_version(self, *, policy_id: int, document: dict, is_active: bool = True) -> "PolicyVersion":
+        """Create a policy version."""
         raise NotImplementedError()
 
     def list_versions(self, policy_id: int, offset: int = 0, limit: int = 50) -> Sequence["PolicyVersion"]:
@@ -129,6 +91,16 @@ class PolicyRepo(Protocol):
 
     def set_active_version(self, policy_id: int, version: int) -> "PolicyVersion":
         """Mark the given version as active and return it."""
+        raise NotImplementedError()
+
+    # Optional alias used by some implementations/tests
+    def activate_version(self, policy_id: int, version: int) -> "PolicyVersion":
+        """Alias for set_active_version; mark the given version as active and return it."""
+        raise NotImplementedError()
+
+    # Convenience lookups
+    def get_active_version_for_slug(self, tenant_id: int, slug: str) -> Optional["PolicyVersion"]:
+        """Get active version for the policy identified by slug."""
         raise NotImplementedError()
 
 
@@ -140,8 +112,12 @@ class PolicyRepo(Protocol):
 class EvidenceRepo(Protocol):
     """
     Contract for evidence item data access.
+
+    Note: We keep legacy add_evidence while adding create_evidence/get_evidence to match the SQLAlchemy adapter
+    (app.repos.evidence_repo.SqlAlchemyEvidenceRepo) and API routes.
     """
 
+    # Legacy/Protocol-first method (hash provided by caller)
     def add_evidence(
         self,
         tenant_id: int,
@@ -156,20 +132,38 @@ class EvidenceRepo(Protocol):
         """Create a new evidence item."""
         raise NotImplementedError()
 
+    # Adapter-preferred method (hash computed by adapter)
+    def create_evidence(
+        self,
+        *,
+        tenant_id: int,
+        evidence_type: str,
+        source: Optional[str] = None,
+        description: Optional[str] = None,
+        content_text: Optional[str] = None,
+        metadata: Optional[dict] = None,
+        policy_id: Optional[int] = None,
+        policy_version_id: Optional[int] = None,
+    ) -> "EvidenceItem":
+        """Create a new evidence item; content_hash is computed internally if possible."""
+        raise NotImplementedError()
+
+    # Lookups
     def get_by_id(self, evidence_id: int) -> Optional["EvidenceItem"]:
-        """Return evidence by id."""
+        """Return evidence by id (Protocol naming)."""
         raise NotImplementedError()
 
     def get_by_hash(self, tenant_id: int, content_hash: str) -> Optional["EvidenceItem"]:
         """Return evidence by content hash within a tenant."""
         raise NotImplementedError()
 
-    def list_for_policy(self, policy_id: int, offset: int = 0, limit: int = 50) -> Sequence["EvidenceItem"]:
-        """List evidence items associated with a policy."""
+    # Adapter convenience (match SqlAlchemyEvidenceRepo and API usage)
+    def get_evidence(self, evidence_id: int) -> Optional["EvidenceItem"]:
+        """Alias/convenience for fetching by id (adapter naming)."""
         raise NotImplementedError()
 
-    def delete(self, evidence: "EvidenceItem") -> None:
-        """Delete an evidence item."""
+    def list_evidence_by_ids(self, ids: Sequence[int]) -> Sequence["EvidenceItem"]:
+        """Batch fetch by ids."""
         raise NotImplementedError()
 
 
@@ -203,6 +197,10 @@ class AuditRepo(Protocol):
         """Fetch a request log by id."""
         raise NotImplementedError()
 
+    def list_requests(self, tenant_id: int, offset: int = 0, limit: int = 50) -> Sequence["RequestLog"]:
+        """List recent requests for a tenant."""
+        raise NotImplementedError()
+
     # Decision logs
     def log_decision(
         self,
@@ -219,6 +217,15 @@ class AuditRepo(Protocol):
 
     def get_decision_for_request(self, request_log_id: int) -> Optional["DecisionLog"]:
         """Return the decision log for a given request, if any."""
+        raise NotImplementedError()
+
+    # Optional conveniences used by routes/tests
+    def get_decision_detail(self, request_log_id: int) -> Optional["DecisionLog"]:
+        """Alias for latest decision for the request (if any)."""
+        raise NotImplementedError()
+
+    def get_decision_by_id(self, decision_id: int) -> Optional["DecisionLog"]:
+        """Return a decision log by id (if present)."""
         raise NotImplementedError()
 
     # Risk scores

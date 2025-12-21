@@ -12,7 +12,7 @@ Routes are thin: they delegate to a PolicyRepo and return Pydantic schemas.
 
 from __future__ import annotations
 
-from typing import Any, Sequence, Type, TypeVar
+from typing import Any, Type, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Path, status
 

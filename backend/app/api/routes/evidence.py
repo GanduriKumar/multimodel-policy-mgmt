@@ -10,7 +10,7 @@ Routes are thin and delegate to EvidenceRepo and Pydantic schemas.
 
 from __future__ import annotations
 
-from typing import Any, Optional, Type, TypeVar
+from typing import Any, Type, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 
@@ -80,7 +80,7 @@ def create_evidence(
             )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal error") from e
 
     return _to_model(EvidenceOut, item)

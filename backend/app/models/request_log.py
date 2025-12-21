@@ -16,8 +16,10 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    Index,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
+from sqlalchemy.ext.mutable import MutableDict
 
 from app.db.base import Base
 
@@ -33,6 +35,7 @@ class RequestLog(Base):
         UniqueConstraint("tenant_id", "input_hash", name="uq_request_tenant_input_hash"),
         # Optional uniqueness for a client-provided request identifier within a tenant
         UniqueConstraint("tenant_id", "request_id", name="uq_request_tenant_request_id"),
+        Index("ix_request_tenant_created", "tenant_id", "created_at"),
     )
 
     # Primary key
@@ -71,7 +74,7 @@ class RequestLog(Base):
     client_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     # Arbitrary request metadata (e.g., headers, tags)
-    metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    metadata: Mapped[dict | None] = mapped_column(MutableDict.as_mutable(JSON), nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
@@ -82,9 +85,11 @@ class RequestLog(Base):
     )
 
     # Relationships
-    tenant = relationship("Tenant", backref="request_logs")
-    policy = relationship("Policy", backref="request_logs")
-    policy_version = relationship("PolicyVersion", backref="request_logs")
+    tenant: Mapped["Tenant"] = relationship("Tenant", backref=backref("request_logs", passive_deletes=True))
+    policy: Mapped["Policy"] = relationship("Policy", backref=backref("request_logs", passive_deletes=True))
+    policy_version: Mapped["PolicyVersion"] = relationship(
+        "PolicyVersion", backref=backref("request_logs", passive_deletes=True)
+    )
 
     def __repr__(self) -> str:
         return (

@@ -16,7 +16,6 @@ import argparse
 import json
 import os
 import sys
-from typing import Tuple, List
 
 # Ensure the 'backend' directory is on sys.path so we can import app modules
 CURRENT_DIR = os.path.dirname(__file__)

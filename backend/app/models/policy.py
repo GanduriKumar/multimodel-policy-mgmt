@@ -16,8 +16,9 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
 
 from app.db.base import Base
 
@@ -53,7 +54,7 @@ class Policy(Base):
 
     # Active flag
     is_active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=True, server_default="1"
+        Boolean, nullable=False, default=True, server_default=text("true")
     )
 
     # Timestamps
@@ -65,7 +66,7 @@ class Policy(Base):
     )
 
     # Relationships
-    tenant = relationship("Tenant", backref="policies")
+    tenant: Mapped["Tenant"] = relationship("Tenant", backref=backref("policies", passive_deletes=True))
     versions: Mapped[list["PolicyVersion"]] = relationship(
         "PolicyVersion",
         back_populates="policy",

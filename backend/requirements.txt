@@ -1,6 +1,6 @@
-fastapi>=0.111.0
-uvicorn[standard]>=0.30.0
-sqlalchemy>=2.0.30
-pydantic>=2.7.0
-pydantic-settings>=2.2.1
-python-dotenv>=1.0.1
+# Runtime dependencies for the FastAPI backend
+fastapi~=0.126.o
+uvicorn[standard]~=0.38.0
+sqlalchemy~=2.0.45
+pydantic~=2.12.5
+pydantic-settings~=2.12.0

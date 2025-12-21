@@ -46,7 +46,13 @@ def _split_reasons(reasons: List[str]) -> tuple[List[str], List[str]]:
     policy: List[str] = []
     risk: List[str] = []
     for r in reasons or []:
-        if r.startswith("prompt_injection:") or r.startswith("pii_like:") or r.startswith("secret_like:") or r.startswith("risk_above_threshold"):
+        if (
+            r.startswith("prompt_injection:")
+            or r.startswith("pii_like:")
+            or r.startswith("secret_like:")
+            or r.startswith("risk_above_threshold")
+            or r == "evidence_missing"
+        ):
             risk.append(r)
         else:
             policy.append(r)
@@ -66,12 +72,12 @@ def list_requests(
     items = repo.list_requests(tenant_id=tenant_id, offset=offset, limit=limit)
     rows: List[AuditListRow] = []
     for req in items:
-        # Try both possible repo methods for fetching a decision for a request
+        # Try both possible repo methods for fetching a decision for a request, prefer explicit alias
         dec = None
-        if hasattr(repo, "get_decision_detail"):
-            dec = getattr(repo, "get_decision_detail")(getattr(req, "id"))  # type: ignore[attr-defined]
-        elif hasattr(repo, "get_decision_for_request"):
+        if hasattr(repo, "get_decision_for_request"):
             dec = getattr(repo, "get_decision_for_request")(getattr(req, "id"))  # type: ignore[attr-defined]
+        if dec is None and hasattr(repo, "get_decision_detail"):
+            dec = getattr(repo, "get_decision_detail")(getattr(req, "id"))  # type: ignore[attr-defined]
         rows.append(_to_row(req, dec))
 
     return AuditListResponse(items=rows, total=len(rows))

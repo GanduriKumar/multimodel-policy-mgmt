@@ -17,6 +17,8 @@ from sqlalchemy import (
     JSON,
     UniqueConstraint,
     func,
+    CheckConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -31,6 +33,7 @@ class PolicyVersion(Base):
     __tablename__ = "policy_version"
     __table_args__ = (
         UniqueConstraint("policy_id", "version", name="uq_policy_version_per_policy"),
+        CheckConstraint("version >= 1", name="ck_policy_version_min"),
     )
 
     # Primary key
@@ -47,12 +50,11 @@ class PolicyVersion(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
     # JSON document representing the policy content/rules for this version
-    # (e.g., structure compatible with app.schemas.policy_format.PolicyDoc)
     document: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
     # Flag indicating if this version is active/published
     is_active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=True, server_default="1"
+        Boolean, nullable=False, default=True, server_default=text("true")
     )
 
     # Timestamps
@@ -64,7 +66,7 @@ class PolicyVersion(Base):
     )
 
     # Relationships
-    policy = relationship("Policy", back_populates="versions")
+    policy: Mapped["Policy"] = relationship("Policy", back_populates="versions", passive_deletes=True)
 
     def __repr__(self) -> str:
         return f"<PolicyVersion id={self.id!r} policy_id={self.policy_id!r} version={self.version!r} active={self.is_active!r}>"

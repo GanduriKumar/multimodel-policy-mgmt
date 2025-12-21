@@ -16,8 +16,11 @@ from sqlalchemy import (
     JSON,
     UniqueConstraint,
     func,
+    CheckConstraint,
+    text,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
+from sqlalchemy.ext.mutable import MutableList
 
 from app.db.base import Base
 
@@ -31,6 +34,7 @@ class RiskScore(Base):
     __table_args__ = (
         # Typically one risk score entry per request within a tenant
         UniqueConstraint("tenant_id", "request_log_id", name="uq_risk_per_request"),
+        CheckConstraint("score >= 0 AND score <= 100", name="ck_risk_score_bounds"),
     )
 
     # Primary key
@@ -66,11 +70,11 @@ class RiskScore(Base):
     score: Mapped[int] = mapped_column(Integer, nullable=False)
 
     # Explainability: reasons produced by the risk engine (e.g., ["prompt_injection:ignore_previous_instructions"])
-    reasons: Mapped[list[str] | None] = mapped_column(JSON, nullable=True, default=list)
+    reasons: Mapped[list[str] | None] = mapped_column(MutableList.as_mutable(JSON), nullable=True, default=list)
 
     # Whether supporting evidence was present at scoring time
     evidence_present: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False, server_default="0"
+        Boolean, nullable=False, default=False, server_default=text("false")
     )
 
     # Timestamps
@@ -82,10 +86,14 @@ class RiskScore(Base):
     )
 
     # Relationships
-    tenant = relationship("Tenant", backref="risk_scores")
-    request_log = relationship("RequestLog", backref="risk_scores")
-    policy = relationship("Policy", backref="risk_scores")
-    policy_version = relationship("PolicyVersion", backref="risk_scores")
+    tenant: Mapped["Tenant"] = relationship("Tenant", backref=backref("risk_scores", passive_deletes=True))
+    request_log: Mapped["RequestLog"] = relationship(
+        "RequestLog", backref=backref("risk_scores", passive_deletes=True)
+    )
+    policy: Mapped["Policy"] = relationship("Policy", backref=backref("risk_scores", passive_deletes=True))
+    policy_version: Mapped["PolicyVersion"] = relationship(
+        "PolicyVersion", backref=backref("risk_scores", passive_deletes=True)
+    )
 
     def __repr__(self) -> str:
         return (

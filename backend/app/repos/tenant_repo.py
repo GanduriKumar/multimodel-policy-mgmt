@@ -5,8 +5,8 @@ Provides minimal operations:
 - create_tenant(name, api_key_hash, is_active=True): creates a tenant with a generated unique slug
 - get_by_api_key_hash(api_key_hash): fetch tenant by stored API key hash
 
-Also implements a few common helpers compatible with the TenantRepo Protocol
-(get_by_id, get_by_slug, list, update, delete, create) for broader use.
+Also implements common helpers aligned with the TenantRepo Protocol:
+- get_by_id, get_by_slug, list, create, update, delete
 """
 
 from __future__ import annotations
@@ -79,7 +79,6 @@ class SqlAlchemyTenantRepo:
             self.session.commit()
         except IntegrityError as exc:
             self.session.rollback()
-            # Likely name or api_key_hash unique conflict
             raise ValueError("Tenant creation failed due to uniqueness constraint") from exc
         self.session.refresh(tenant)
         return tenant
@@ -89,7 +88,7 @@ class SqlAlchemyTenantRepo:
         Return tenant by API key hash (case-insensitive for hex strings).
         """
         if not isinstance(api_key_hash, str) or not api_key_hash.strip():
-            return None
+            raise ValueError("api_key_hash must be a non-empty string")
         stmt = select(Tenant).where(Tenant.api_key_hash == api_key_hash.strip().lower())
         return self.session.execute(stmt).scalars().first()
 
@@ -98,18 +97,19 @@ class SqlAlchemyTenantRepo:
     # -------------------------------------------------
 
     def get_by_id(self, tenant_id: int) -> Optional[Tenant]:
-        return self.session.get(Tenant, int(tenant_id))
+        stmt = select(Tenant).where(Tenant.id == int(tenant_id))
+        return self.session.execute(stmt).scalars().first()
 
     def get_by_slug(self, slug: str) -> Optional[Tenant]:
-        stmt = select(Tenant).where(Tenant.slug == slug)
+        stmt = select(Tenant).where(Tenant.slug == slug.strip())
         return self.session.execute(stmt).scalars().first()
 
     def list(self, offset: int = 0, limit: int = 50) -> Sequence[Tenant]:
         stmt = (
             select(Tenant)
             .order_by(Tenant.created_at.desc())
-            .offset(max(0, offset))
-            .limit(max(1, limit))
+            .offset(max(0, int(offset)))
+            .limit(max(1, int(limit)))
         )
         return list(self.session.execute(stmt).scalars().all())
 

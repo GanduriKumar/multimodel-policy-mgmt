@@ -18,7 +18,8 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
+from sqlalchemy.ext.mutable import MutableDict
 
 from app.db.base import Base
 
@@ -71,7 +72,7 @@ class EvidenceItem(Base):
     content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
     # Arbitrary metadata payload (structured)
-    metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    metadata: Mapped[dict | None] = mapped_column(MutableDict.as_mutable(JSON), nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
@@ -82,9 +83,11 @@ class EvidenceItem(Base):
     )
 
     # Relationships
-    tenant = relationship("Tenant", backref="evidence_items")
-    policy = relationship("Policy", backref="evidence_items")
-    policy_version = relationship("PolicyVersion", backref="evidence_items")
+    tenant: Mapped["Tenant"] = relationship("Tenant", backref=backref("evidence_items", passive_deletes=True))
+    policy: Mapped["Policy"] = relationship("Policy", backref=backref("evidence_items", passive_deletes=True))
+    policy_version: Mapped["PolicyVersion"] = relationship(
+        "PolicyVersion", backref=backref("evidence_items", passive_deletes=True)
+    )
 
     def __repr__(self) -> str:
         return (
