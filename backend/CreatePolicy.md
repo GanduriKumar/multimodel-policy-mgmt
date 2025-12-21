@@ -24,6 +24,7 @@ Example with curl:
 curl -X POST http://localhost:8000/api/policies \
   -H "Content-Type: application/json" \
   -d '{
+    "tenant_id": 1,
     "name": "Content Safety",
     "slug": "content-safety",
     "description": "Blocks unsafe words",
@@ -38,7 +39,7 @@ Step 2 — Add a policy version (the actual rules)
 
 {
   "blocked_terms": ["forbidden", "secret sauce"],
-  "allowed_if_evidence": ["url"]  // if you have evidence tagged as "url", it can allow certain content
+  "allowed_if_evidence": ["url"]
 }
 
 - Use the “add version” endpoint shown in the docs (often POST /api/policies/{policy_id}/versions).
@@ -67,15 +68,17 @@ curl -X POST http://localhost:8000/api/policies/POLICY_ID/versions/1/activate
 
 Step 4 — Use the policy to check text
 - There’s a “protect” endpoint that takes your text and the policy to check against (see /docs; often POST /api/protect).
-- You send the policy slug and the text, and it returns allowed: true/false and reasons.
+- You send the tenant id, policy slug, and the text. It returns allowed: true/false and reasons.
 
 Example with curl:
 
 curl -X POST http://localhost:8000/api/protect \
   -H "Content-Type: application/json" \
   -d '{
+    "tenant_id": 1,
     "policy_slug": "content-safety",
-    "input_text": "this contains a forbidden word"
+    "input_text": "this contains a forbidden word",
+    "evidence_types": []
   }'
 
 Example response:

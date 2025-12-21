@@ -6,36 +6,61 @@ This example shows how to place the backend between your app and an LLM:
 - Post-check the LLM draft with the backend before returning it.
 
 Files
-- genai_bidirectional_app.py — runnable script demonstrating the flow.
+- Runner script: [backend/SampleAppIntegration.py](backend/SampleAppIntegration.py)
+- Protect route implemented in: [backend/app/api/routes/protect.py](backend/app/api/routes/protect.py)
+- Decision orchestration: [backend/app/services/decision_service.py](backend/app/services/decision_service.py)
 
 Prerequisites
 - Backend running locally:
-  - make run (see [../Makefile](../Makefile))
+  - make run (see [backend/Makefile](backend/Makefile))
+  - or: python -m uvicorn app.main:app --reload --port 8000
+- Policy exists and has an active version (see [backend/CreatePolicy.md](backend/CreatePolicy.md))
 - Environment:
-  - OPENAI_API_KEY: your OpenAI API key
+  - OPENAI_API_KEY: your OpenAI key
   - Optional:
     - BACKEND_URL (default http://localhost:8000)
-    - BACKEND_API_KEY (if your backend enforces API keys)
+    - BACKEND_API_KEY (if backend enforces API keys)
     - BACKEND_API_KEY_HEADER (default x-api-key)
     - OPENAI_MODEL (default gpt-4o-mini)
 
+How it works
+1) Your app asks the backend if text is allowed under a policy:
+   - POST /api/protect with tenant_id, policy_slug, input_text
+2) If allowed, your app calls the LLM provider.
+3) Optionally, send the model output back to /api/protect for a post-check.
+
 Run
+
 - Prompt via CLI argument:
-  python backend/examples/genai_bidirectional_app.py --tenant-id 1 --policy-slug content-safety --prompt "Hello!"
+  - python backend/SampleAppIntegration.py --tenant-id 1 --policy-slug content-safety --prompt "Hello!"
 
 - Prompt via STDIN:
-  echo "Summarize: ..." | python backend/examples/genai_bidirectional_app.py --tenant-id 1 --policy-slug content-safety
+  - echo "Summarize: ..." | python backend/SampleAppIntegration.py --tenant-id 1 --policy-slug content-safety
 
-- JSON output (includes decisions and content):
-  echo "Hello" | python backend/examples/genai_bidirectional_app.py --tenant-id 1 --policy-slug content-safety --json
+- JSON output (includes pre/post decisions and content):
+  - echo "Hello" | python backend/SampleAppIntegration.py --tenant-id 1 --policy-slug content-safety --json
 
-Notes
-- The backend endpoints used are implemented in:
-  - Protect route: [app.api.routes.protect](../app/api/routes/protect.py)
-  - Decision orchestration: [app.services.decision_service](../app/services/decision_service.py)
-- Policies should be created and an active version set. See:
-  - [../CreatePolicy.md](../CreatePolicy.md)
-```// filepath: backend/examples/README.md
+Options (CLI)
+- --tenant-id: Tenant identifier used by backend policies
+- --policy-slug: Policy slug to enforce (e.g., content-safety)
+- --prompt: Prompt text; omit to read from STDIN
+- --evidence-types: Comma-separated tags like url,document
+- --backend-url: Backend base URL (default http://localhost:8000)
+- --backend-api-key / --backend-api-key-header: API key configuration if enforced
+- --openai-api-key / --openai-model: LLM provider credentials and model
+- --json: Emit a machine-readable JSON result
+
+What to expect
+- If pre-check denies, the script exits with a clear message and reasons.
+- If pre-check allows, the script calls OpenAI and then post-checks the output.
+- If post-check denies, reasons explain which rule triggered.
+- On success, the final content is printed (or a JSON blob when --json is set).
+
+Troubleshooting
+- 400/500 from /api/protect: ensure tenant_id, policy_slug, and input_text are set and backend is running.
+- Empty output: ensure OPENAI_API_KEY is configured and your model name is valid.
+- CORS or auth errors (for web apps): use the correct API key header name; see settings in backend.
+```// filepath: backend/SampleAPPIntegration.md
 # Bidirectional backend integration example (Python)
 
 This example shows how to place the backend between your app and an LLM:
@@ -44,32 +69,57 @@ This example shows how to place the backend between your app and an LLM:
 - Post-check the LLM draft with the backend before returning it.
 
 Files
-- genai_bidirectional_app.py — runnable script demonstrating the flow.
+- Runner script: [backend/SampleAppIntegration.py](backend/SampleAppIntegration.py)
+- Protect route implemented in: [backend/app/api/routes/protect.py](backend/app/api/routes/protect.py)
+- Decision orchestration: [backend/app/services/decision_service.py](backend/app/services/decision_service.py)
 
 Prerequisites
 - Backend running locally:
-  - make run (see [../Makefile](../Makefile))
+  - make run (see [backend/Makefile](backend/Makefile))
+  - or: python -m uvicorn app.main:app --reload --port 8000
+- Policy exists and has an active version (see [backend/CreatePolicy.md](backend/CreatePolicy.md))
 - Environment:
-  - OPENAI_API_KEY: your OpenAI API key
+  - OPENAI_API_KEY: your OpenAI key
   - Optional:
     - BACKEND_URL (default http://localhost:8000)
-    - BACKEND_API_KEY (if your backend enforces API keys)
+    - BACKEND_API_KEY (if backend enforces API keys)
     - BACKEND_API_KEY_HEADER (default x-api-key)
     - OPENAI_MODEL (default gpt-4o-mini)
 
+How it works
+1) Your app asks the backend if text is allowed under a policy:
+   - POST /api/protect with tenant_id, policy_slug, input_text
+2) If allowed, your app calls the LLM provider.
+3) Optionally, send the model output back to /api/protect for a post-check.
+
 Run
+
 - Prompt via CLI argument:
-  python backend/examples/genai_bidirectional_app.py --tenant-id 1 --policy-slug content-safety --prompt "Hello!"
+  - python backend/SampleAppIntegration.py --tenant-id 1 --policy-slug content-safety --prompt "Hello!"
 
 - Prompt via STDIN:
-  echo "Summarize: ..." | python backend/examples/genai_bidirectional_app.py --tenant-id 1 --policy-slug content-safety
+  - echo "Summarize: ..." | python backend/SampleAppIntegration.py --tenant-id 1 --policy-slug content-safety
 
-- JSON output (includes decisions and content):
-  echo "Hello" | python backend/examples/genai_bidirectional_app.py --tenant-id 1 --policy-slug content-safety --json
+- JSON output (includes pre/post decisions and content):
+  - echo "Hello" | python backend/SampleAppIntegration.py --tenant-id 1 --policy-slug content-safety --json
 
-Notes
-- The backend endpoints used are implemented in:
-  - Protect route: [app.api.routes.protect](../app/api/routes/protect.py)
-  - Decision orchestration: [app.services.decision_service](../app/services/decision_service.py)
-- Policies should be created and an active version set. See:
-  - [../CreatePolicy.md](../CreatePolicy.md)
+Options (CLI)
+- --tenant-id: Tenant identifier used by backend policies
+- --policy-slug: Policy slug to enforce (e.g., content-safety)
+- --prompt: Prompt text; omit to read from STDIN
+- --evidence-types: Comma-separated tags like url,document
+- --backend-url: Backend base URL (default http://localhost:8000)
+- --backend-api-key / --backend-api-key-header: API key configuration if enforced
+- --openai-api-key / --openai-model: LLM provider credentials and model
+- --json: Emit a machine-readable JSON result
+
+What to expect
+- If pre-check denies, the script exits with a clear message and reasons.
+- If pre-check allows, the script calls OpenAI and then post-checks the output.
+- If post-check denies, reasons explain which rule triggered.
+- On success, the final content is printed (or a JSON blob when --json is set).
+
+Troubleshooting
+- 400/500 from /api/protect: ensure tenant_id, policy_slug, and input_text are set and backend is running.
+- Empty output: ensure OPENAI_API_KEY is configured and your model name is valid.
+- CORS or auth errors (for web apps): use the correct API key header name; see settings in backend.

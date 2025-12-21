@@ -16,6 +16,11 @@ Monorepo with a Python FastAPI backend and a React (Vite + TypeScript) frontend 
   - Services: [backend/app/services](backend/app/services)
   - Tools/CLIs: [backend/app/tools](backend/app/tools)
   - Makefile: [backend/Makefile](backend/Makefile)
+  - How-to docs:
+    - Backend run guide: [backend/Makefile.md](backend/Makefile.md)
+    - Policy creation: [backend/CreatePolicy.md](backend/CreatePolicy.md)
+    - Deploy & integrate: [backend/Deploy&Integrate.md](backend/Deploy&Integrate.md)
+    - Sample integration app: [backend/SampleAppIntegration.py](backend/SampleAppIntegration.py), [backend/SampleAPPIntegration.md](backend/SampleAPPIntegration.md)
 - frontend/ — Vite + React TypeScript UI
 - constitution.md — architectural rules and guidelines
 
@@ -23,155 +28,144 @@ Monorepo with a Python FastAPI backend and a React (Vite + TypeScript) frontend 
 
 ## Backend changes since last update
 
+Architecture and core
+- Unified error responses with ValidationError mapping and optional AuthError handling:
+  - [`app.core.errors`](backend/app/core/errors.py)
+- DI providers for repos/services:
+  - [`app.core.deps.get_decision_service`](backend/app/core/deps.py)
+
 Models
-- Portable boolean defaults via server defaults:
-  - [`app.models.tenant.Tenant`](backend/app/models/tenant.py)
+- Versioned policies and decision/audit entities:
   - [`app.models.policy.Policy`](backend/app/models/policy.py)
   - [`app.models.policy_version.PolicyVersion`](backend/app/models/policy_version.py)
+  - [`app.models.request_log.RequestLog`](backend/app/models/request_log.py)
   - [`app.models.decision_log.DecisionLog`](backend/app/models/decision_log.py)
   - [`app.models.risk_score.RiskScore`](backend/app/models/risk_score.py)
-- Track in-place JSON mutations:
-  - [`app.models.evidence_item.EvidenceItem`](backend/app/models/evidence_item.py) metadata uses MutableDict
-  - [`app.models.request_log.RequestLog`](backend/app/models/request_log.py) metadata uses MutableDict
-  - [`app.models.decision_log.DecisionLog`](backend/app/models/decision_log.py) reasons uses MutableList
-  - [`app.models.risk_score.RiskScore`](backend/app/models/risk_score.py) reasons uses MutableList
-- Integrity and indexing:
-  - Version min bound in [`app.models.policy_version.PolicyVersion`](backend/app/models/policy_version.py)
-  - Risk score bounds in [`app.models.risk_score.RiskScore`](backend/app/models/risk_score.py)
-  - Composite/indexed timestamps in [`app.models.request_log.RequestLog`](backend/app/models/request_log.py)
+- Policy approval workflow (draft -> approved -> active -> retired):
+  - [`app.models.policy_approval.PolicyApproval`](backend/app/models/policy_approval.py)
+  - Workflow service: [`app.services.policy_workflow.PolicyWorkflowService`](backend/app/services/policy_workflow.py)
 
 Repositories
-- Regenerated SQLAlchemy adapters with consistent pagination and validation:
+- SQLAlchemy adapters with pagination and activation logic:
   - [`app.repos.policy_repo.SqlAlchemyPolicyRepo`](backend/app/repos/policy_repo.py)
   - [`app.repos.evidence_repo.SqlAlchemyEvidenceRepo`](backend/app/repos/evidence_repo.py)
   - [`app.repos.audit_repo.SqlAlchemyAuditRepo`](backend/app/repos/audit_repo.py)
   - [`app.repos.tenant_repo.SqlAlchemyTenantRepo`](backend/app/repos/tenant_repo.py)
 
-Schemas
-- Pydantic v1/v2 compatibility across:
-  - [backend/app/schemas/policies.py](backend/app/schemas/policies.py)
-  - [backend/app/schemas/evidence.py](backend/app/schemas/evidence.py)
-  - [backend/app/schemas/protect.py](backend/app/schemas/protect.py)
-  - [backend/app/schemas/policy_format.py](backend/app/schemas/policy_format.py)
+Services and engines
+- Decision orchestration and engines:
+  - [`app.services.decision_service.protect`](backend/app/services/decision_service.py)
+  - [`app.services.policy_engine.evaluate_policy`](backend/app/services/policy_engine.py)
+  - [`app.services.risk_engine.compute_risk`](backend/app/services/risk_engine.py)
+- New components:
+  - Tamper-evident ledger: [`app.services.governance_ledger.GovernanceLedger`](backend/app/services/governance_ledger.py)
+  - Groundedness scoring: [`app.services.groundedness_engine.GroundednessEngine`](backend/app/services/groundedness_engine.py)
 
-Core
-- Unified error responses and optional auth error binding:
-  - [backend/app/core/errors.py](backend/app/core/errors.py)
-- DI providers for repos/services:
-  - [backend/app/core/deps.py](backend/app/core/deps.py)
+API routes
+- Policy, evidence, audit, and protect endpoints:
+  - [backend/app/api/routes/policies.py](backend/app/api/routes/policies.py)
+  - [backend/app/api/routes/evidence.py](backend/app/api/routes/evidence.py)
+  - [backend/app/api/routes/audit.py](backend/app/api/routes/audit.py)
+  - [backend/app/api/routes/protect.py](backend/app/api/routes/protect.py)
 
-App entry and tools
-- App wiring, CORS, health/version:
-  - [backend/app/main.py](backend/app/main.py)
-- CLIs:
-  - [backend/app/tools/run_risk.py](backend/app/tools/run_risk.py)
+Tooling and examples
+- CLI tools:
   - [backend/app/tools/run_policy.py](backend/app/tools/run_policy.py)
-
-Docs and ergonomics
-- Make targets for run/test/lint/format: [backend/Makefile](backend/Makefile)
-- Makefile how-to: [backend/Makefile.md](backend/Makefile.md)
-- Plain-English policy walkthrough: [backend/CreatePolicy.md](backend/CreatePolicy.md)
-- Deployment and integration narrative: [backend/Deploy&Integrate.md](backend/Deploy&Integrate.md)
+  - [backend/app/tools/run_risk.py](backend/app/tools/run_risk.py)
+- Sample GenAI integration (pre/post policy checks around LLM calls):
+  - [backend/SampleAppIntegration.py](backend/SampleAppIntegration.py)
+  - [backend/SampleAPPIntegration.md](backend/SampleAPPIntegration.md)
 
 ---
 
 ## 1) Bring up the backend independently and create policies
 
-Prerequisites
-- Python 3.11+
-- In a terminal:
-  - macOS/Linux: `python -m venv backend/.venv && source backend/.venv/bin/activate`
-  - Windows (PowerShell): `python -m venv backend\.venv; .\backend\.venv\Scripts\Activate.ps1`
-- Install dependencies:
-  - `cd backend && pip install -e .` or `pip install -r requirements.txt`
+Setup
+- Create venv and install:
+  - macOS/Linux:
+    - `cd backend && python -m venv .venv && source .venv/bin/activate`
+  - Windows (PowerShell):
+    - `cd backend && python -m venv .venv; .\.venv\Scripts\Activate.ps1`
+  - Install:
+    - `pip install -r requirements.txt` or `pip install -e .`
 
-Environment (optional)
-- DATABASE_URL=sqlite:///./app.db
-- ALLOW_ORIGINS=*
-- APP_VERSION=0.1.0
-
-Create database tables (no migrations)
-- From backend:
-  - `python -c "from app.db.base import Base, import_all_models; from app.db.session import engine; import_all_models(); Base.metadata.create_all(bind=engine)"`
+Initialize database (no migrations)
+- `cd backend`
+- `python -c "from app.db.base import Base, import_all_models; from app.db.session import engine; import_all_models(); Base.metadata.create_all(bind=engine)"`  
+  Files: [backend/app/db/base.py](backend/app/db/base.py), [backend/app/db/session.py](backend/app/db/session.py)
 
 Run the API
-- With Make: `cd backend && make run`
-- Directly: `cd backend && python -m uvicorn app.main:app --reload --port 8000`
+- With Makefile:
+  - `cd backend && make run`
+- Or direct Uvicorn:
+  - `cd backend && python -m uvicorn app.main:app --reload --port 8000`
+  - Entry: [backend/app/main.py](backend/app/main.py)
 
 Verify
 - Health: http://localhost:8000/api/health
 - Docs: http://localhost:8000/docs
 
 Quick policy creation
-- Create a policy:
-  - POST /api/policies
-  - Body:
-    {
-      "tenant_id": 1,
-      "name": "Content Safety",
-      "slug": "content-safety",
-      "description": "Blocks unsafe words",
-      "is_active": true
-    }
-- Add a version (rules):
-  - POST /api/policies/{policy_id}/versions
-  - Body:
-    {
-      "policy_id": 1,
-      "document": {
-        "blocked_terms": ["forbidden", "secret sauce"],
-        "allowed_sources": [],
-        "required_evidence_types": [],
-        "pii_rules": {},
-        "risk_threshold": 80
-      },
-      "is_active": true
-    }
-- Activate a version (if needed):
-  - POST /api/policies/{policy_id}/versions/{version}/activate
-- Evaluate text via protect:
-  - POST /api/protect
-  - Body:
-    {
-      "tenant_id": 1,
-      "policy_slug": "content-safety",
-      "input_text": "this contains a forbidden word",
-      "evidence_types": []
-    }
+- Create a policy (POST /api/policies):
+  {
+    "tenant_id": 1,
+    "name": "Content Safety",
+    "slug": "content-safety",
+    "description": "Blocks unsafe words",
+    "is_active": true
+  }
+- Add a policy version (POST /api/policies/{policy_id}/versions):
+  {
+    "policy_id": 1,
+    "document": {
+      "blocked_terms": ["forbidden", "secret sauce"],
+      "allowed_sources": [],
+      "required_evidence_types": [],
+      "pii_rules": {},
+      "risk_threshold": 80
+    },
+    "is_active": true
+  }
+- Activate a version (POST /api/policies/{policy_id}/versions/{version}/activate)
+- Evaluate text via protect (POST /api/protect):
+  {
+    "tenant_id": 1,
+    "policy_slug": "content-safety",
+    "input_text": "this contains a forbidden word",
+    "evidence_types": []
+  }
 
-More details: [backend/CreatePolicy.md](backend/CreatePolicy.md). Processing pipeline: [`app.services.decision_service.protect`](backend/app/services/decision_service.py), policy evaluation: [`app.services.policy_engine.evaluate_policy`](backend/app/services/policy_engine.py).
+More details: [backend/CreatePolicy.md](backend/CreatePolicy.md). Processing: [`app.services.decision_service.protect`](backend/app/services/decision_service.py), policy evaluation: [`app.services.policy_engine.evaluate_policy`](backend/app/services/policy_engine.py).
 
 ---
 
 ## 2) Integrate and deploy for runtime bidirectional policy management and governance
 
-Purpose
+Goal
 - Place the backend as a gate before and after LLM calls to enforce policies and log/audit decisions.
 
 Patterns
-- Pre-check (recommended): Check user input before calling the LLM.
-- Sandwich: Check both user input and model output before showing it to users.
-- Observe-only: Log decisions and risk without blocking during pilot phases.
+- Pre-check: Validate user input via backend before LLM call.
+- Sandwich: Check both user input and model output.
+- Observe-only: Log/risk without blocking (pilot mode).
 
-JavaScript/TypeScript example (pre + post check)
-- Pre-check user input; if allowed, call LLM; optionally post-check the draft:
-
+JavaScript/TypeScript example
 ```ts
+// Pre + post check around your LLM call
 async function protectAndCallLLM(userText: string) {
-  // 1) Ask backend to check the text
   const pre = await fetch("https://your-backend.app/api/protect", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
+      tenant_id: 1,
       policy_slug: "content-safety",
       input_text: userText,
-      evidence_types: [],
+      evidence_types: []
     }),
   }).then(r => r.json());
-
   if (!pre.allowed) return { error: "Blocked by policy", reasons: pre.reasons };
 
-  // 2) Call LLM provider (example: OpenAI; swap for your provider)
+  // Call LLM (example: OpenAI)
   const llmRes = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -186,78 +180,57 @@ async function protectAndCallLLM(userText: string) {
   const data = await llmRes.json();
   const draft = data.choices?.[0]?.message?.content ?? "";
 
-  // 3) Optional post-check
   const post = await fetch("https://your-backend.app/api/protect", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
+      tenant_id: 1,
       policy_slug: "content-safety",
       input_text: draft,
-      evidence_types: [],
+      evidence_types: []
     }),
   }).then(r => r.json());
-
   if (!post.allowed) return { error: "Output blocked by policy", reasons: post.reasons };
+
   return { content: draft };
 }
 ```
 
-Python example (server-to-server)
+Python example
 ```python
-import os, requests
+import os, json, urllib.request
 
-BACKEND = os.getenv("BACKEND_URL", "https://your-backend.app")
+BACKEND = os.getenv("BACKEND_URL", "http://localhost:8000")
 
-def protect(text: str) -> dict:
-  r = requests.post(f"{BACKEND}/api/protect", json={
-    "policy_slug": "content-safety",
-    "input_text": text,
-    "evidence_types": []
-  }, timeout=15)
-  r.raise_for_status()
-  return r.json()
-
-def call_llm(text: str) -> str:
-  from openai import OpenAI
-  client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-  resp = client.chat.completions.create(
-    model="gpt-4o-mini",
-    messages=[{"role": "user", "content": text}],
-  )
-  return resp.choices[0].message.content
-
-def guarded_generation(user_text: str) -> dict:
-  pre = protect(user_text)
-  if not pre.get("allowed"):
-    return {"error": "Blocked by policy", "reasons": pre.get("reasons", [])}
-  draft = call_llm(user_text)
-  post = protect(draft)
-  if not post.get("allowed"):
-    return {"error": "Output blocked by policy", "reasons": post.get("reasons", [])}
-  return {"content": draft}
+def protect(text: str, tenant_id: int = 1, policy_slug: str = "content-safety") -> dict:
+    payload = {"tenant_id": tenant_id, "policy_slug": policy_slug, "input_text": text, "evidence_types": []}
+    req = urllib.request.Request(
+        f"{BACKEND.rstrip('/')}/api/protect",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST"
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return json.loads(resp.read().decode("utf-8"))
 ```
 
 Deploy options
-- Single VM (simple)
-  - Create venv, install deps, run Uvicorn:
-    - `python -m uvicorn app.main:app --host 0.0.0.0 --port 8000`
+- Single VM
+  - `python -m uvicorn app.main:app --host 0.0.0.0 --port 8000`
 - Docker
-  - Minimal Dockerfile:
-    - FROM python:3.11-slim
-    - WORKDIR /app
-    - COPY backend /app
-    - RUN pip install --no-cache-dir -r requirements.txt
-    - EXPOSE 8000
-    - CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-- PaaS (Render/Fly/Heroku/Azure App Service)
+  - Minimal image running `uvicorn app.main:app`
+- PaaS (Render/Fly/Heroku/Azure)
   - Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 
 Configuration checklist
 - DATABASE_URL (Postgres recommended for production)
 - ALLOW_ORIGINS (frontend origin or *)
 - APP_VERSION
-- API key secret (if enforcing key-based access): one of AUTH_HMAC_SECRET, API_KEY_SECRET, SECRET_KEY
-- Optional SQL echo flag via settings in [backend/app/core/config.py](backend/app/core/config.py)
+- Governance ledger (optional):
+  - GOVERNANCE_LEDGER_PATH, GOVERNANCE_LEDGER_HMAC_SECRET
+  - Service: [`app.services.governance_ledger.GovernanceLedger`](backend/app/services/governance_ledger.py)
+- Groundedness checks (optional scoring of output vs evidence):
+  - Service: [`app.services.groundedness_engine.GroundednessEngine`](backend/app/services/groundedness_engine.py)
 
 Observability and governance
 - Health: GET /api/health; Version: GET /api/version
@@ -265,8 +238,7 @@ Observability and governance
 - Errors: standardized JSON from [backend/app/core/errors.py](backend/app/core/errors.py)
 - Policy evaluation: [`app.services.policy_engine`](backend/app/services/policy_engine.py)
 - Risk scoring: [`app.services.risk_engine`](backend/app/services/risk_engine.py)
-
-More deployment details and integration narrative: [backend/Deploy&Integrate.md](backend/Deploy&Integrate.md)
+- Ledger verification: [`app.services.governance_ledger.GovernanceLedger.verify_chain`](backend/app/services/governance_ledger.py)
 
 ---
 

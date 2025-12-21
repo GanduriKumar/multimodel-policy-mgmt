@@ -15,10 +15,14 @@ Env vars:
 
 Usage examples:
   # Prompt via argument
-  python backend/examples/genai_bidirectional_app.py --tenant-id 1 --policy-slug content-safety --prompt "Hello"
+  python backend/SampleAppIntegration.py --tenant-id 1 --policy-slug content-safety --prompt "Hello"
 
   # Or read prompt from STDIN
-  echo "Summarize this text..." | python backend/examples/genai_bidirectional_app.py --tenant-id 1 --policy-slug content-safety
+  echo "Summarize this text..." | python backend/SampleAppIntegration.py --tenant-id 1 --policy-slug content-safety
+
+Notes:
+- Protect endpoint: see backend route [app.api.routes.protect](backend/app/api/routes/protect.py)
+- Orchestration: see service [app.services.decision_service](backend/app/services/decision_service.py)
 """
 
 from __future__ import annotations
@@ -33,7 +37,7 @@ from typing import Any, Dict, Optional, Set
 
 
 def _json_post(url: str, payload: Dict[str, Any], headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
-    data = json.dumps(payload).encode("utf-8")
+    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(url, data=data, method="POST")
     req.add_header("Content-Type", "application/json")
     if headers:
@@ -61,6 +65,9 @@ def protect(
     api_key: Optional[str] = None,
     api_key_header: str = "x-api-key",
 ) -> Dict[str, Any]:
+    """
+    Call the backend /api/protect endpoint with the given payload.
+    """
     url = backend_url.rstrip("/") + "/api/protect"
     headers: Dict[str, str] = {}
     if api_key:
@@ -88,7 +95,7 @@ def call_openai_chat(*, api_key: str, model: str, prompt: str) -> str:
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.2,
     }
-    data = json.dumps(payload).encode("utf-8")
+    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(url, data=data, method="POST")
     for k, v in headers.items():
         req.add_header(k, v)
@@ -146,15 +153,20 @@ def main() -> int:
     ev_types = {s.strip() for s in (args.evidence_types or "").split(",") if s.strip()}
 
     # Pre-check
-    pre = protect(
-        backend_url=args.backend_url,
-        tenant_id=args.tenant_id,
-        policy_slug=args.policy_slug,
-        text=prompt,
-        evidence_types=ev_types,
-        api_key=args.backend_api_key,
-        api_key_header=args.backend_api_key_header,
-    )
+    try:
+        pre = protect(
+            backend_url=args.backend_url,
+            tenant_id=args.tenant_id,
+            policy_slug=args.policy_slug,
+            text=prompt,
+            evidence_types=ev_types,
+            api_key=args.backend_api_key,
+            api_key_header=args.backend_api_key_header,
+        )
+    except Exception as e:
+        print(f"Error calling backend (pre-check): {e}", file=sys.stderr)
+        return 9
+
     if not pre.get("allowed", False):
         if args.json:
             print(json.dumps({"stage": "pre", "decision": pre}, ensure_ascii=False))
@@ -173,15 +185,20 @@ def main() -> int:
         return 11
 
     # Post-check
-    post = protect(
-        backend_url=args.backend_url,
-        tenant_id=args.tenant_id,
-        policy_slug=args.policy_slug,
-        text=draft,
-        evidence_types=ev_types,
-        api_key=args.backend_api_key,
-        api_key_header=args.backend_api_key_header,
-    )
+    try:
+        post = protect(
+            backend_url=args.backend_url,
+            tenant_id=args.tenant_id,
+            policy_slug=args.policy_slug,
+            text=draft,
+            evidence_types=ev_types,
+            api_key=args.backend_api_key,
+            api_key_header=args.backend_api_key_header,
+        )
+    except Exception as e:
+        print(f"Error calling backend (post-check): {e}", file=sys.stderr)
+        return 13
+
     if not post.get("allowed", False):
         if args.json:
             print(json.dumps({"stage": "post", "decision": post, "draft": draft}, ensure_ascii=False))

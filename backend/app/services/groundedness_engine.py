@@ -1,43 +1,34 @@
 """
-Claim Extraction and Groundedness Engine.
+Simple deterministic groundedness engine for model outputs.
 
-This module provides two lightweight services:
- - ClaimExtraction: splits model output into simple "claims" (sentences/clauses)
- - GroundednessEngine: scores each claim against provided EvidenceBundles and
-   determines whether the claim is supported by retrieved evidence.
+Contract (aligned with tests):
+- Pydantic model Claim(text: str, evidence_ids: list[int] | None = None)
+- Pydantic model GroundednessResult(claim: Claim, score: float, supported: bool, matched_evidence_ids: list[int])
+- GroundednessEngine.score_output(model_output: str, evidence_texts: list[str]) -> list[GroundednessResult]
 
-Design goals
- - Zero external dependencies; fast, heuristic-based scoring
- - Friendly types and straightforward integration points
- - Safe defaults; production systems can swap with an LLM-based verifier
-
-Typical usage
-    extractor = ClaimExtraction()
-    claims = extractor.extract_claims(output_text)
-
-    engine = GroundednessEngine()
-    result = engine.evaluate_groundedness(output_text, evidence_bundles)
-
-Where evidence_bundles is a list of ORM objects (EvidenceBundle) or dict-like
-objects with fields: {id, chunks: [str, ...]}.
+Implementation notes:
+- Heuristic, deterministic scoring based on token overlap (Jaccard) with a substring shortcut.
+- Evidence IDs are derived from input order (0-based indices) as we receive plain strings.
 """
 
 from __future__ import annotations
 
 import re
 import string
-from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import List
 
-# Optional import for type hints; the engine works with dict-like bundles too
-try:  # pragma: no cover - import guarded for loose coupling
-    from app.models.evidence_bundle import EvidenceBundle  # noqa: F401
+# Pydantic v2 first, v1 fallback
+try:
+    from pydantic import BaseModel, Field  # type: ignore
 except Exception:  # pragma: no cover
-    EvidenceBundle = Any  # type: ignore
+    from pydantic import BaseModel  # type: ignore
+
+    def Field(*_args, **_kwargs):  # type: ignore
+        return None
 
 
 # -----------------------------
-# Utility helpers
+# Utilities
 # -----------------------------
 
 _PUNCT_TABLE = str.maketrans({k: " " for k in string.punctuation})
@@ -51,7 +42,7 @@ def _tokens(text: str) -> List[str]:
     return [t for t in _normalize(text).split() if len(t) >= 2]
 
 
-def _jaccard(a: Iterable[str], b: Iterable[str]) -> float:
+def _jaccard(a: List[str], b: List[str]) -> float:
     sa, sb = set(a), set(b)
     if not sa or not sb:
         return 0.0
@@ -61,170 +52,94 @@ def _jaccard(a: Iterable[str], b: Iterable[str]) -> float:
 
 
 def _sentences(text: str) -> List[str]:
-    # Naive sentence split on . ! ? and newlines; keeps simple clauses
     parts = re.split(r"[\.!?\n]+", text)
-    # Trim and filter tiny/empty parts
     return [p.strip() for p in parts if p and len(p.strip()) >= 5]
 
 
 # -----------------------------
-# Data structures
+# Pydantic models
 # -----------------------------
 
-@dataclass
-class Claim:
-    id: int
-    text: str
-    tokens: List[str] = field(default_factory=list)
+class Claim(BaseModel):
+    text: str = Field(..., description="Extracted claim text (sentence)")
+    evidence_ids: List[int] | None = Field(default=None, description="IDs of matching evidence (0-based indices)")
 
 
-@dataclass
-class Match:
-    bundle_id: Optional[int]
-    chunk_index: int
-    score: float
-
-
-@dataclass
-class ClaimAssessment:
-    claim_id: int
-    text: str
+class GroundednessResult(BaseModel):
+    claim: Claim
+    score: float = Field(..., ge=0.0, le=1.0)
     supported: bool
-    score: float
-    matches: List[Match] = field(default_factory=list)
-
-
-@dataclass
-class GroundednessReport:
-    output_text: str
-    overall_score: float
-    threshold: float
-    claims: List[ClaimAssessment]
+    matched_evidence_ids: List[int] = Field(default_factory=list)
 
 
 # -----------------------------
-# Claim extraction
-# -----------------------------
-
-class ClaimExtraction:
-    """Heuristic claim extractor using sentence segmentation and tokenization."""
-
-    def __init__(self, min_len: int = 12) -> None:
-        self.min_len = min_len
-
-    def extract_claims(self, output_text: str) -> List[Claim]:
-        claims: List[Claim] = []
-        sid = 1
-        for sent in _sentences(output_text):
-            if len(sent) < self.min_len:
-                continue
-            toks = _tokens(sent)
-            if len(toks) < 3:
-                continue
-            claims.append(Claim(id=sid, text=sent, tokens=toks))
-            sid += 1
-        return claims
-
-
-# -----------------------------
-# Groundedness scoring
+# Engine
 # -----------------------------
 
 class GroundednessEngine:
-    """Compute groundedness of claims w.r.t. EvidenceBundles.
+    """
+    Compute groundedness of claims against evidence texts.
 
-    Strategy
-    - For each claim, compute maximum similarity against all evidence chunks.
-    - Similarity uses token Jaccard with a fast substring check
-      (substring -> score=1.0).
-    - A claim is supported if best_score >= threshold.
+    Strategy:
+    - Split model output into simple sentences (“claims”).
+    - For each claim, compute a best-match score across evidence texts:
+        - If claim is a substring of an evidence text (normalized), score = 1.0
+        - Else, score = Jaccard(token_set(claim), token_set(evidence_text))
+    - supported = score >= threshold
     """
 
     def __init__(self, threshold: float = 0.30) -> None:
+        if not (0.0 <= float(threshold) <= 1.0):
+            raise ValueError("threshold must be in [0.0, 1.0]")
         self.threshold = float(threshold)
 
-    # Public API
-    def evaluate_groundedness(
-        self,
-        output_text: str,
-        bundles: Sequence[EvidenceBundle | Dict[str, Any]],
-    ) -> GroundednessReport:
-        extractor = ClaimExtraction()
-        claims = extractor.extract_claims(output_text)
-        assessments: List[ClaimAssessment] = []
+    def score_output(self, model_output: str, evidence_texts: List[str]) -> List[GroundednessResult]:
+        if not isinstance(model_output, str):
+            raise TypeError("model_output must be a str")
+        if not isinstance(evidence_texts, list):
+            raise TypeError("evidence_texts must be a list[str]")
 
-        for claim in claims:
-            best_score = 0.0
-            matches: List[Match] = []
-            for b_idx, (bid, chunks) in enumerate(self._iter_bundle_chunks(bundles)):
-                for ci, ch_text in enumerate(chunks):
-                    score = self._chunk_similarity(claim.tokens, ch_text)
-                    if score > 0:
-                        matches.append(Match(bundle_id=bid, chunk_index=ci, score=score))
-                    if score > best_score:
-                        best_score = score
-            supported = best_score >= self.threshold
-            # Keep top-k matches (e.g., 5) for brevity
-            matches.sort(key=lambda m: m.score, reverse=True)
-            assessments.append(
-                ClaimAssessment(
-                    claim_id=claim.id,
-                    text=claim.text,
-                    supported=supported,
-                    score=best_score,
-                    matches=matches[:5],
+        evid_norm: List[str] = [_normalize(str(e or "")) for e in evidence_texts]
+        evid_tokens: List[List[str]] = [_tokens(str(e or "")) for e in evidence_texts]
+
+        results: List[GroundednessResult] = []
+        for sent in _sentences(model_output):
+            ctoks = _tokens(sent)
+            if len(ctoks) < 3:
+                # Very small claims are unlikely to be meaningful; score 0
+                claim = Claim(text=sent)
+                results.append(GroundednessResult(claim=claim, score=0.0, supported=False, matched_evidence_ids=[]))
+                continue
+
+            cnorm = " ".join(ctoks)
+            best = 0.0
+            matched_ids: List[int] = []
+
+            for idx, (enorm, etoks) in enumerate(zip(evid_norm, evid_tokens)):
+                if not enorm and not etoks:
+                    continue
+                # Substring shortcut (normalized)
+                if cnorm and cnorm in enorm:
+                    score = 1.0
+                else:
+                    score = _jaccard(ctoks, etoks)
+
+                if score > 0.0:
+                    matched_ids.append(idx)
+                if score > best:
+                    best = score
+
+            supported = best >= self.threshold
+            claim = Claim(text=sent, evidence_ids=matched_ids or None)
+            results.append(
+                GroundednessResult(
+                    claim=claim,
+                    score=float(best),
+                    supported=bool(supported),
+                    matched_evidence_ids=list(matched_ids),
                 )
             )
-
-        overall = self._aggregate_overall(assessments)
-        return GroundednessReport(
-            output_text=output_text,
-            overall_score=overall,
-            threshold=self.threshold,
-            claims=assessments,
-        )
-
-    # Internals
-    def _iter_bundle_chunks(
-        self, bundles: Sequence[EvidenceBundle | Dict[str, Any]]
-    ) -> Iterable[Tuple[Optional[int], List[str]]]:
-        for b in bundles:
-            try:
-                # ORM-like
-                bid = getattr(b, "id", None)
-                chunks = list(getattr(b, "chunks", []) or [])
-            except Exception:
-                bid = None
-                chunks = []
-            # Dict-like override
-            if isinstance(b, dict):
-                bid = b.get("id", bid)
-                chunks = list(b.get("chunks", chunks) or [])
-            # Ensure string chunks
-            chunks = [str(c) for c in chunks if isinstance(c, (str, bytes))]
-            yield bid, chunks
-
-    def _chunk_similarity(self, claim_tokens: List[str], chunk_text: str) -> float:
-        if not chunk_text:
-            return 0.0
-        norm_chunk = _normalize(chunk_text)
-        # Quick substring: if claim string appears in chunk, mark as 1.0
-        claim_str = " ".join(claim_tokens)
-        if claim_str and claim_str in norm_chunk:
-            return 1.0
-        return _jaccard(claim_tokens, _tokens(norm_chunk))
-
-    def _aggregate_overall(self, assessments: List[ClaimAssessment]) -> float:
-        if not assessments:
-            return 0.0
-        # Simple average of individual scores
-        return sum(a.score for a in assessments) / max(1, len(assessments))
+        return results
 
 
-__all__ = [
-    "ClaimExtraction",
-    "GroundednessEngine",
-    "Claim",
-    "ClaimAssessment",
-    "GroundednessReport",
-]
+__all__ = ["Claim", "GroundednessResult", "GroundednessEngine"]

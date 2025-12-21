@@ -1,4 +1,157 @@
 """
+RAGProxy: capture retrievals for end-to-end tracing and optional governance.
+
+Contract implemented:
+- start_session(context: dict | None = None) -> str  -> returns generated trace_id
+- record_retrieval(trace_id: str, query: str, chunks: list[dict]) -> None
+
+Behavior:
+- Maintains an in-memory session store keyed by trace_id.
+- For each record_retrieval, normalizes chunks and stores a compact preview
+  plus deterministic content hashes.
+- Optionally emits an "evidence" entry into the GovernanceLedger for each chunk.
+
+Configuration (via app.core.config.get_settings):
+- rag_emit_ledger: bool (default True)
+- rag_chunk_preview_length: int (default 256)
+
+Back-compat:
+- Exposes InMemoryRAGProxy as an alias to RAGProxy for existing imports.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+import uuid
+from typing import Any, Dict, List, Optional
+
+from app.core.config import get_settings
+from app.core.hashing import sha256_text
+
+try:  # optional; tests may run without it
+    from app.services.governance_ledger import GovernanceLedger
+except Exception:  # pragma: no cover
+    GovernanceLedger = None  # type: ignore[assignment]
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _preview(text: str, n: int) -> str:
+    return text[: max(0, int(n))]
+
+
+@dataclass
+class _RetrievalEvent:
+    timestamp: str
+    query: str
+    chunks: List[Dict[str, Any]]
+
+
+@dataclass
+class _Session:
+    trace_id: str
+    created_at: str
+    context: Dict[str, Any] = field(default_factory=dict)
+    retrievals: List[_RetrievalEvent] = field(default_factory=list)
+
+
+class RAGProxy:
+    """Small in-memory RAG tracing proxy with optional governance emission."""
+
+    def __init__(self, *, emit_to_ledger: Optional[bool] = None, chunk_preview_len: Optional[int] = None) -> None:
+        settings = get_settings()
+        # Resolve configuration with safe defaults
+        self._emit_to_ledger: bool = (
+            bool(getattr(settings, "rag_emit_ledger", True)) if emit_to_ledger is None else bool(emit_to_ledger)
+        )
+        self._preview_len: int = (
+            int(getattr(settings, "rag_chunk_preview_length", 256)) if chunk_preview_len is None else int(chunk_preview_len)
+        )
+
+        self._sessions: Dict[str, _Session] = {}
+        self._ledger = None
+        if self._emit_to_ledger and GovernanceLedger is not None:
+            try:
+                self._ledger = GovernanceLedger()
+            except Exception:  # pragma: no cover
+                self._ledger = None
+
+    # ---------------------------------
+    # Public API (required by contract)
+    # ---------------------------------
+
+    def start_session(self, context: Optional[Dict[str, Any]] = None) -> str:
+        trace_id = str(uuid.uuid4())
+        self._sessions[trace_id] = _Session(trace_id=trace_id, created_at=_now_iso(), context=dict(context or {}))
+        return trace_id
+
+    def record_retrieval(self, trace_id: str, query: str, chunks: List[Dict[str, Any]]) -> None:
+        sess = self._sessions.get(trace_id)
+        if not sess:
+            raise KeyError(f"Unknown trace_id: {trace_id}")
+
+        norm_chunks: List[Dict[str, Any]] = []
+        for ch in chunks or []:
+            text = str(ch.get("text", ""))
+            source_uri = ch.get("source_uri") or ch.get("source")
+            metadata = ch.get("metadata") or {}
+            document_hash = ch.get("document_hash")
+            chunk_hash = ch.get("chunk_hash")
+            # Deterministic content hash based on text when explicit chunk_hash is missing
+            content_hash = chunk_hash or sha256_text(text)
+            preview = _preview(text, self._preview_len)
+
+            item = {
+                "preview": preview,
+                "content_hash": content_hash,
+                "document_hash": document_hash,
+                "source_uri": source_uri,
+                "metadata": metadata,
+            }
+            norm_chunks.append(item)
+
+            # Optionally emit evidence entry per chunk to ledger
+            if self._ledger is not None:
+                payload = {
+                    "query": query,
+                    "source_uri": source_uri,
+                    "document_hash": document_hash,
+                    "chunk_hash": content_hash,
+                    "preview": preview,
+                    "metadata": metadata,
+                }
+                try:
+                    self._ledger.append_entry("evidence", payload, trace_id)  # type: ignore[attr-defined]
+                except Exception:  # pragma: no cover - do not break flow on ledger errors
+                    pass
+
+        sess.retrievals.append(_RetrievalEvent(timestamp=_now_iso(), query=query, chunks=norm_chunks))
+
+    # ---------------------------------
+    # Convenience helpers
+    # ---------------------------------
+
+    def get_session(self, trace_id: str) -> Dict[str, Any]:
+        sess = self._sessions.get(trace_id)
+        if not sess:
+            raise KeyError(f"Unknown trace_id: {trace_id}")
+        return {
+            "trace_id": sess.trace_id,
+            "created_at": sess.created_at,
+            "context": dict(sess.context),
+            "retrievals": [
+                {"timestamp": r.timestamp, "query": r.query, "chunks": list(r.chunks)} for r in sess.retrievals
+            ],
+        }
+
+
+# Back-compat alias
+InMemoryRAGProxy = RAGProxy
+
+"""
 RAG interception interface and service.
 
 Goal
