@@ -10,6 +10,7 @@ Sub-routers included (if present):
 - app.api.routes.evidence  -> /api/evidence
 - app.api.routes.audit     -> /api/audit
 - app.api.routes.policies  -> /api/policies
+- app.api.routes.traces    -> /api/traces
 """
 
 from __future__ import annotations
@@ -56,6 +57,7 @@ def _include_known_subrouters(parent: APIRouter) -> List[str]:
         "app.api.routes.evidence",
         "app.api.routes.audit",
         "app.api.routes.policies",
+        "app.api.routes.traces",
     ]
     included: List[str] = []
     for mod in candidates:
