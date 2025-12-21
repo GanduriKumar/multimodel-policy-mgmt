@@ -1,19 +1,21 @@
 """
-GovernedGenerationService: Orchestrates protect + generate + groundedness with governance.
+GovernedGenerationService: Orchestrates protect + generate + safety + groundedness with governance.
 
 Flow:
 1) Record inbound request to GovernanceLedger and start a RAG session -> trace_id
 2) Call DecisionService.protect; if denied, return immediately (allow=False)
 3) If allowed, record retrieval context via RAGProxy (using retrieval_query/evidence_payloads)
 4) Call LLMClient to generate raw_model_output
-5) Score groundedness using GroundednessEngine
-6) Optionally enforce minimum groundedness threshold from settings
-7) Record decision and model_output to GovernanceLedger and return response
+5) Run ResponseSafetyEngine on raw_model_output
+6) Score groundedness using GroundednessEngine
+7) Optionally enforce minimum groundedness threshold from settings
+8) Optionally enforce minimum safety level from settings
+9) Record safety report, decision and model_output to GovernanceLedger and return response
 """
 
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Dict
 
 from app.core.config import get_settings
 from app.core.deps import DecisionService
@@ -23,6 +25,7 @@ from app.schemas.generation import (
     ProtectGenerateResponse,
 )
 from app.services.groundedness_engine import GroundednessEngine
+from app.services.response_safety_engine import ResponseSafetyEngine
 from app.services.llm_gateway import LLMClient
 from app.services.rag_proxy import RAGProxy
 from app.services.governance_ledger import GovernanceLedger
@@ -35,12 +38,15 @@ class GovernedGenerationService:
         decision_service: DecisionService,
         llm_client: LLMClient,
         groundedness_engine: GroundednessEngine,
+        safety_engine: Optional[ResponseSafetyEngine] = None,
         rag_proxy: RAGProxy,
         ledger: GovernanceLedger,
     ) -> None:
         self.decision_service = decision_service
         self.llm = llm_client
         self.grounded = groundedness_engine
+        # Backward compatible: allow None and create a default engine
+        self.safety = safety_engine or ResponseSafetyEngine()
         self.rag = rag_proxy
         self.ledger = ledger
 
@@ -126,7 +132,28 @@ class GovernedGenerationService:
             "options": {"temperature": 0},  # deterministic-ish
         })
 
-        # 5) Groundedness scoring
+        # 5) Safety evaluation (deterministic, no external calls)
+        safety_report = self.safety.evaluate(raw_model_output)
+        # Summarize issues for inclusion in reasons and ledger; keep messages concise
+        safety_issues_slim: List[Dict[str, str]] = [
+            {
+                "kind": iss.kind,
+                "severity": iss.severity,
+                "message": (iss.message[:120] if isinstance(iss.message, str) else ""),
+            }
+            for iss in safety_report.issues
+        ]
+        # Highest severity present (none -> -1)
+        severity_order = {"low": 0, "medium": 1, "high": 2}
+        max_sev_level = -1
+        max_sev_name = None
+        for iss in safety_report.issues:
+            lvl = severity_order.get(str(iss.severity).lower(), 1)
+            if lvl > max_sev_level:
+                max_sev_level = lvl
+                max_sev_name = str(iss.severity).lower()
+
+        # 6) Groundedness scoring
         evidence_texts = [str(ch.get("text", "")) for ch in (request.evidence_payloads or [])]
         g_results = self.grounded.score_output(raw_model_output, evidence_texts)
         grounded_claims = [
@@ -140,7 +167,7 @@ class GovernedGenerationService:
         ]
         overall = (sum(gc.score for gc in grounded_claims) / max(1, len(grounded_claims))) if grounded_claims else 0.0
 
-        # 6) Enforce minimum groundedness threshold (optional)
+        # 7) Enforce minimum groundedness threshold (optional)
         min_g = 0.0
         try:
             # Read from settings if present; default to 0.0 (no enforcement)
@@ -153,13 +180,42 @@ class GovernedGenerationService:
             allowed = False
             policy_reasons.append(f"groundedness_below_threshold:{overall:.2f}<{min_g:.2f}")
 
-        # 7) Governance: record decision and model output
+        # 8) Enforce minimum safety level (optional)
+        min_safety_level_name = str(getattr(settings, "MIN_SAFETY_LEVEL", "")).strip().lower() or None
+        if min_safety_level_name and min_safety_level_name in severity_order:
+            threshold = severity_order[min_safety_level_name]
+            if max_sev_level >= threshold and max_sev_level >= 0:
+                allowed = False
+                # Include compact summary of issues in reasons
+                policy_reasons.append(
+                    f"safety_below_threshold:{max_sev_name}>={min_safety_level_name}"
+                )
+        # Always add a summary reason for visibility
+        policy_reasons.append(f"is_safe_output:{str(safety_report.is_safe).lower()}")
+        # Also add individual safety issue summaries into risk_reasons
+        for iss in safety_issues_slim[:10]:  # cap to avoid overly long responses
+            risk_reasons.append(
+                f"safety_issue:{iss['kind']}:{iss['severity']}:{iss['message']}"
+            )
+
+        # 9) Governance: record model output, safety, and decision
         self.ledger.append_entry(
             "model_output",
             {
                 "provider": "llm_gateway",
                 "model": getattr(self.llm, "model", None),
                 "preview": raw_model_output[:256],
+            },
+            trace_id,
+        )
+        # Safety report entry
+        self.ledger.append_entry(
+            "safety_report",
+            {
+                "is_safe": safety_report.is_safe,
+                "issues": safety_issues_slim,
+                "max_issue_severity": max_sev_name,
+                "min_safety_level": min_safety_level_name,
             },
             trace_id,
         )
@@ -171,16 +227,25 @@ class GovernedGenerationService:
                 "risk_score": result["risk_score"],
                 "groundedness_overall": overall,
                 "min_groundedness": min_g,
+                "is_safe_output": safety_report.is_safe,
+                "max_safety_issue_severity": max_sev_name,
+                "min_safety_level": min_safety_level_name,
             },
             trace_id,
         )
 
-        return ProtectGenerateResponse(
-            allowed=allowed,
-            risk_score=result["risk_score"],
-            policy_reasons=policy_reasons,
-            risk_reasons=risk_reasons,
-            grounded_claims=grounded_claims,
-            raw_model_output=raw_model_output,
-            trace_id=trace_id,
-        )
+        # Build response; include safety fields if the schema permits extras; also mirrored in reasons
+        response_kwargs: Dict[str, Any] = {
+            "allowed": allowed,
+            "risk_score": result["risk_score"],
+            "policy_reasons": policy_reasons,
+            "risk_reasons": risk_reasons,
+            "grounded_claims": grounded_claims,
+            "raw_model_output": raw_model_output,
+            "trace_id": trace_id,
+        }
+        # Extras (some Pydantic configs ignore extras; reasons already carry summaries regardless)
+        response_kwargs["is_safe_output"] = safety_report.is_safe
+        response_kwargs["safety_issues"] = safety_issues_slim
+
+        return ProtectGenerateResponse(**response_kwargs)
