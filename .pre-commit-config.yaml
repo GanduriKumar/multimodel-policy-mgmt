@@ -1,0 +1,55 @@
+minimum_pre_commit_version: '3.5.0'
+
+repos:
+  # General housekeeping hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-added-large-files
+      - id: check-merge-conflict
+
+  # Python lint/format: Ruff (fast, includes isort-like import rules)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        name: ruff (backend)
+        args: ["--fix", "--exit-non-zero-on-fix"]
+        files: ^backend/.*\.py$
+      - id: ruff-format
+        name: ruff format (backend)
+        files: ^backend/.*\.py$
+
+  # Local hooks
+  - repo: local
+    hooks:
+      # Run backend tests with pytest (only when Python files under backend/ are staged)
+      - id: backend-pytest
+        name: backend pytest
+        entry: python -m pytest -q
+        language: system
+        types: [python]
+        files: ^backend/
+        pass_filenames: false
+        stages: [commit, push]
+
+      # Optional: Frontend ESLint (only runs if frontend/package.json exists and frontend files are staged)
+      - id: frontend-eslint
+        name: frontend eslint (optional)
+        language: python
+        entry: python -c "import os, subprocess, sys; p='frontend/package.json'; sys.exit(0) if not os.path.exists(p) else sys.exit(subprocess.call(['npm','--prefix','frontend','run','-s','lint']))"
+        files: ^frontend/.*\.(ts|tsx|js|jsx)$
+        pass_filenames: false
+        stages: [commit]
+
+      # Optional: Frontend tests via Vitest (non-watch, only when frontend files are staged)
+        
+      - id: frontend-vitest
+        name: frontend vitest (optional)
+        language: python
+        entry: python -c "import os, subprocess, sys; p='frontend/package.json'; sys.exit(0) if not os.path.exists(p) else sys.exit(subprocess.call(['npm','--prefix','frontend','run','-s','test','--','--run']))"
+        files: ^frontend/.*\.(ts|tsx|js|jsx)$
+        pass_filenames: false
+        stages: [commit]

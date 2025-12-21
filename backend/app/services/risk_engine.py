@@ -90,3 +90,22 @@ def compute_risk(input_text: str, evidence_present: bool) -> tuple[int, list[str
     score = max(0, min(100, score))
 
     return score, sorted(reasons)
+
+def _split_reasons(reasons: List[str]) -> tuple[List[str], List[str]]:
+    """
+    Split combined reasons into (policy_reasons, risk_reasons) heuristically.
+    """
+    policy: List[str] = []
+    risk: List[str] = []
+    for r in reasons or []:
+        if (
+            r.startswith("prompt_injection:")
+            or r.startswith("pii_like:")
+            or r.startswith("secret_like:")
+            or r.startswith("risk_above_threshold")
+            or r == "evidence_missing"  # risk engine marker
+        ):
+            risk.append(r)
+        else:
+            policy.append(r)
+    return policy, risk

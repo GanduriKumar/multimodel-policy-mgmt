@@ -1,74 +1,179 @@
 # Multimodel Policy Management (Monorepo)
 
-This repository is a monorepo that hosts both backend and frontend for Multimodel Policy Management.
-
-- Architecture, layering, DI, testing strategy, naming, error handling, and logging are governed by the authoritative document: [constitution.md](./constitution.md).
+Monorepo containing a Python FastAPI backend and a React (Vite + TypeScript) frontend for multimodel policy management. Architecture, layering, DI, testing, error handling, and logging follow the principles in the authoritative document: [constitution.md](./constitution.md).
 
 ## Repository structure
 
-Top-level packages:
-- `backend/` — server-side services and APIs (implementation follows the constitution; no business logic in route handlers).
-- `frontend/` — client/UI application.
+- backend/ — FastAPI application, domain/services, repositories, and tests
+- frontend/ — Vite + React TypeScript UI
+- constitution.md — architectural rules and guidelines
 
-Key backend additions (MVP):
-- `backend/app/core/`
-	- `hashing.py` — deterministic SHA-256 helpers for text and JSON.
-	- `patterns.py` — simple detectors for prompt injection, secrets, PII.
-	- `auth.py` — HMAC-SHA256 API key hashing/verification via env secret.
-	- `contracts.py` — repository Protocols (TenantRepo, PolicyRepo, EvidenceRepo, AuditRepo).
-	- `deps.py` — DI wiring for repos and the decision service.
-- `backend/app/schemas/`
-	- `policy_format.py` — Pydantic `PolicyDoc` schema.
-- `backend/app/services/`
-	- `risk_engine.py` — risk scoring from detectors.
-	- `policy_engine.py` — evaluate policy rules and evidence.
-	- `decision_service.py` — orchestrates request logging, policy evaluation, and risk.
-- `backend/app/db/`
-	- `session.py` — SQLAlchemy engine/session and `get_db()` dependency.
-	- `base.py` — Declarative Base and model auto-import hook.
-- `backend/app/models/`
-	- `tenant.py` — adds `api_key_hash` (nullable, unique) and timestamps.
-	- `policy.py`, `policy_version.py` — policies and version snapshots (JSON document).
-	- `evidence_item.py`, `request_log.py`, `decision_log.py`, `risk_score.py` — audit and evidence entities.
-- `backend/app/repos/`
-	- `policy_repo.py` — create/list policies, add/activate versions, fetch active doc.
-	- `evidence_repo.py` — create/get/list evidence with deterministic content hashing.
-	- `audit_repo.py` — request/decision logging helpers.
-	- `tenant_repo.py` — create tenant with API key hash and lookups.
-- `backend/app/api/`
-	- `router.py` — shared APIRouter aggregator (best-effort includes sub-routers).
-	- `routes/protect.py` — `POST /api/protect` endpoint using DecisionService.
-- `backend/app/tools/`
-	- `run_risk.py` — CLI: score text from stdin.
-	- `run_policy.py` — CLI: evaluate policy JSON against stdin text.
-- `backend/app/main.py` — FastAPI app with CORS and health/version endpoints.
-- `backend/tests/`
-	- `conftest.py` — isolated temp-file SQLite for tests.
-	- Fakes for unit tests: `tests/fakes.py`.
-	- Unit/integration tests for core, services, repos, and API.
+Key backend modules (non-exhaustive):
+- app/core: hashing, patterns (detectors), auth, config, logging, errors, DI deps, contracts
+- app/services: risk_engine, policy_engine, decision_service, auth_service
+- app/db: SQLAlchemy engine/session and Declarative Base
+- app/models: tenant, policy, policy_version, evidence_item, request_log, decision_log, risk_score
+- app/repos: policy_repo, evidence_repo, audit_repo, tenant_repo
+- app/api: router and route modules (protect, policies, evidence, audit)
+- app/tools: CLI entry points (run_risk.py, run_policy.py)
+- app/main.py: FastAPI app entry
 
-## Getting started
-1) Read the [constitution.md](./constitution.md) before making changes.
-2) Work inside the corresponding package folder (`backend/` or `frontend/`).
-3) Keep business logic in the Application/Domain layers; adapters in Infrastructure; routes/controllers only delegate.
+## Prerequisites
 
-Backend quickstart:
-- Python 3.11+ recommended.
-- From `backend/`, install dependencies per `pyproject.toml` (e.g., `pip install -e .` or your preferred tool).
-- Environment variables (optional):
-	- `DATABASE_URL` (default: `sqlite:///./app.db`)
-	- `SQLALCHEMY_ECHO` ("1" to enable SQL echo)
-	- `ALLOW_ORIGINS` (CORS, comma-separated or "*")
-	- API key HMAC secret (one of): `API_KEY_SECRET`, `AUTH_SECRET`, `SECRET_KEY`, `APP_AUTH_SECRET`
-- Run API locally:
-	- `cd backend` then `uvicorn app.main:app --reload`
-	- Health: `GET /api/health`, Version: `GET /api/version`
-	- Protect endpoint is defined in `app.api.routes.protect`. Include its router in your app if not already aggregated.
+- Python 3.11+
+- Node.js 18+ (or 20+)
+- npm (or pnpm/yarn)
 
-Testing:
-- From repo root or `backend/`, run `pytest -q`.
-	- Tests cover hashing, detectors, risk/policy engines, repositories, decision service, and API route with dependency override.
+---
+
+## Backend: setup and run
+
+1) Create and activate a virtual environment
+
+- Windows PowerShell
+	- cd backend
+	- py -3.11 -m venv .venv
+	- .\.venv\Scripts\Activate.ps1
+
+2) Install dependencies
+
+- Using pip
+	- python -m pip install --upgrade pip
+	- pip install -e .
+
+- Using uv (optional)
+	- uv pip install -e .
+
+3) Configure environment (optional defaults shown)
+
+- DATABASE_URL=sqlite:///./app.db
+- SQLALCHEMY_ECHO=0
+- ALLOW_ORIGINS=*
+- API key HMAC secret (choose one): API_KEY_SECRET, AUTH_SECRET, SECRET_KEY, APP_AUTH_SECRET
+
+4) Run the API server
+
+- cd backend
+- uvicorn app.main:app --reload --port 8000
+
+Health and version:
+- GET http://localhost:8000/api/health
+- GET http://localhost:8000/api/version
+
+Primary endpoint:
+- POST http://localhost:8000/api/protect
+
+CLI helpers (optional):
+- python -m app.tools.run_risk < input.txt
+- python -m app.tools.run_policy --policy policy.json < input.txt
+
+---
+
+## Running tests (backend)
+
+From repo root or backend/:
+
+- All tests (unit + integration + API)
+	- pytest -q
+
+- Run a specific test module
+	- pytest -q backend/tests/test_hashing.py
+	- pytest -q backend/tests/test_policy_engine.py
+	- pytest -q backend/tests/test_api_protect.py
+
+- Filter tests by keyword
+	- pytest -q -k risk_engine
+
+- With coverage
+	- pytest -q --cov=app --cov-report=term-missing
+
+Notes
+- Tests use a temp SQLite database and do not require external services.
+- API tests use FastAPI TestClient with dependency overrides where needed.
+
+---
+
+## Frontend: setup and run
+
+1) Configure environment
+
+- cd frontend
+- Copy .env.example to .env and update values as needed:
+	- VITE_API_BASE_URL=http://localhost:8000
+	- VITE_API_KEY=your-dev-api-key
+
+2) Install and start
+
+- npm install
+- npm run dev
+
+App will be available at:
+- http://localhost:5173
+
+Build for production:
+- npm run build
+- npm run preview
+
+---
+
+## Docker Compose (optional)
+
+If you prefer containers, save the example below as docker-compose.yml in the repo root, then run the commands in the Usage section.
+
+Example docker-compose.yml:
+
+```yaml
+version: '3.9'
+services:
+	backend:
+		build:
+			context: ./backend
+		working_dir: /app
+		environment:
+			DATABASE_URL: sqlite:////data/app.db
+			ALLOW_ORIGINS: "*"
+			API_KEY_SECRET: "dev-secret"
+		volumes:
+			- backend_data:/data
+		ports:
+			- "8000:8000"
+		command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+	frontend:
+		build:
+			context: ./frontend
+		environment:
+			VITE_API_BASE_URL: http://localhost:8000
+			VITE_API_KEY: dev-frontend-key
+		ports:
+			- "5173:5173"
+		command: npm run dev -- --host 0.0.0.0 --port 5173
+		depends_on:
+			- backend
+
+volumes:
+	backend_data:
+```
+
+Usage:
+- docker compose up --build
+- Open http://localhost:8000 (API) and http://localhost:5173 (UI)
+- docker compose down
+
+Notes
+- This setup uses SQLite for persistence inside a named volume (backend_data).
+- For production, consider a managed database and production builds (e.g., serve frontend as static files).
+
+---
+
+## Troubleshooting
+
+- If the API fails to start, check environment variables and Python dependencies in backend/.
+- If the frontend cannot reach the API, ensure VITE_API_BASE_URL is set to the API origin and CORS is configured (ALLOW_ORIGINS).
+- On Windows PowerShell, execution policy might block venv activation; run PowerShell as Administrator and set-ExecutionPolicy RemoteSigned if needed.
 
 ## Contributing
-- Follow the testing pyramid (unit > integration > API) and enforce import/layer boundaries.
-- Submit PRs that pass CI checks and respect the review checklist in the constitution.
+
+- Follow the testing pyramid and the architectural rules in constitution.md.
+- Keep business logic in services/engines; routes are thin delegators.
+- Add/maintain tests for all changes before submitting PRs.
