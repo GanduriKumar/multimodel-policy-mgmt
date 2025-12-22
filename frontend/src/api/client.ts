@@ -47,7 +47,26 @@ async function handleResponse<T>(res: Response): Promise<T> {
   const isJson = ct.includes("application/json");
   const data = isJson ? await res.json().catch(() => undefined) : await res.text().catch(() => undefined);
   if (!res.ok) {
-    const err: any = new Error((data && (data.message || data.error?.message)) || `HTTP ${res.status}`);
+    // Surface common FastAPI error shapes:
+    // - { detail: string | array }
+    // - { message: string }
+    // - { error: { message: string } }
+    let message = `HTTP ${res.status}`;
+    if (data && typeof data === "object") {
+      const anyData: any = data;
+      if (typeof anyData.detail === "string" && anyData.detail.trim()) {
+        message = anyData.detail.trim();
+      } else if (Array.isArray(anyData.detail) && anyData.detail.length) {
+        message = anyData.detail
+          .map((d: any) => d?.msg || d?.message || JSON.stringify(d))
+          .join("; ");
+      } else if (typeof anyData.message === "string" && anyData.message.trim()) {
+        message = anyData.message.trim();
+      } else if (anyData.error?.message) {
+        message = String(anyData.error.message);
+      }
+    }
+    const err: any = new Error(message);
     err.status = res.status;
     err.data = data;
     throw err;

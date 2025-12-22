@@ -8,7 +8,7 @@ support a policy, a particular policy version, or be associated with a tenant br
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import (
     DateTime,
@@ -56,8 +56,12 @@ class EvidenceItem(Base):
     content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
     # Arbitrary metadata (tracked for in-place JSON mutations)
-    metadata: Mapped[dict | None] = mapped_column(
-        MutableDict.as_mutable(JSON), nullable=True, default=dict
+    # Use attribute name metadata_json to avoid conflict with Declarative "metadata"
+    metadata_json: Mapped[dict | None] = mapped_column(
+        "metadata",  # DB column name
+        MutableDict.as_mutable(JSON),
+        nullable=True,
+        default=dict,
     )
 
     # Optional policy linkage
@@ -77,15 +81,18 @@ class EvidenceItem(Base):
     )
 
     # Relationships (lazy select-in for batch efficiency)
-    tenant: "Mapped[Tenant]" = relationship(
+    tenant: Mapped["Tenant"] = relationship(
         "Tenant", backref=backref("evidence_items", lazy="selectin")
     )
-    policy: "Mapped[Policy] | None" = relationship(
+    policy: Mapped[Optional["Policy"]] = relationship(
         "Policy", backref=backref("evidence_items", lazy="selectin")
     )
-    policy_version: "Mapped[PolicyVersion] | None" = relationship(
+    policy_version: Mapped[Optional["PolicyVersion"]] = relationship(
         "PolicyVersion", backref=backref("evidence_items", lazy="selectin")
     )
+
+    # Note: Do not create a class-level attribute/property named 'metadata'
+    # as it conflicts with SQLAlchemy Declarative's MetaData access.
 
     def __repr__(self) -> str:  # pragma: no cover
         return (

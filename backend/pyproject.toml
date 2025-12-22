@@ -7,7 +7,7 @@ name = "multimodel-policy-mgmt-backend"
 version = "0.1.0"
 description = "FastAPI backend for Multimodel Policy Management"
 requires-python = ">=3.12"
-readme = { text = "Backend service for Multimodel Policy Management (see repository root README and constitution)." }
+readme = { text = "Backend service for Multimodel Policy Management (see repository root README and constitution).", content-type = "text/plain" }
 keywords = ["fastapi", "policy", "backend", "monorepo"]
 classifiers = [
   "Programming Language :: Python :: 3",

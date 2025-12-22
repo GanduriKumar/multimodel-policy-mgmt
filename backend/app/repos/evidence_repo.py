@@ -121,7 +121,7 @@ class SqlAlchemyEvidenceRepo:
             source=source,
             description=description,
             content_hash=content_hash,
-            metadata=metadata,
+            metadata_json=metadata,
         )
         self.session.add(item)
         self.session.commit()
@@ -167,7 +167,7 @@ class SqlAlchemyEvidenceRepo:
             source=source,
             description=description,
             content_hash=content_hash,
-            metadata=metadata,
+            metadata_json=metadata,
         )
         self.session.add(item)
         self.session.commit()

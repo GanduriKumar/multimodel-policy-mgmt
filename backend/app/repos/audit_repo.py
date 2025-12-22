@@ -74,7 +74,7 @@ class SqlAlchemyAuditRepo:
             input_hash=ihash,
             user_agent=user_agent,
             client_ip=client_ip,
-            metadata=metadata,
+            metadata_json=metadata,
         )
         self.session.add(req)
         self.session.commit()

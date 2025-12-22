@@ -74,7 +74,12 @@ class RequestLog(Base):
     client_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     # Arbitrary request metadata (e.g., headers, tags)
-    metadata: Mapped[dict | None] = mapped_column(MutableDict.as_mutable(JSON), nullable=True)
+    # Avoid reserved attribute name 'metadata' at Declarative class level
+    metadata_json: Mapped[dict | None] = mapped_column(
+        "metadata",  # DB column name
+        MutableDict.as_mutable(JSON),
+        nullable=True,
+    )
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
@@ -90,6 +95,9 @@ class RequestLog(Base):
     policy_version: Mapped["PolicyVersion"] = relationship(
         "PolicyVersion", backref=backref("request_logs", passive_deletes=True)
     )
+
+    # Note: avoid defining a 'metadata' property at class level
+    # to prevent conflicts with Declarative Base.metadata
 
     def __repr__(self) -> str:
         return (

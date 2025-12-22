@@ -12,7 +12,7 @@ from typing import Optional
 
 # Support both Pydantic v2 (ConfigDict, from_attributes) and v1 (orm_mode)
 try:
-    from pydantic import BaseModel, Field, ConfigDict  # type: ignore
+    from pydantic import BaseModel, Field, ConfigDict, AliasChoices  # type: ignore
 
     class ORMBase(BaseModel):
         model_config = ConfigDict(from_attributes=True)
@@ -60,7 +60,8 @@ class EvidenceOut(ORMBase):
     source: Optional[str] = None
     description: Optional[str] = None
     content_hash: Optional[str] = None
-    metadata: Optional[dict] = None
+    # Read from model attribute 'metadata_json' (renamed to avoid SQLAlchemy reserved name)
+    metadata: Optional[dict] = Field(default=None, validation_alias=AliasChoices("metadata_json", "metadata"))
 
     # Timestamps
     created_at: datetime
