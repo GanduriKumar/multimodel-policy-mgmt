@@ -13,7 +13,6 @@ Provided factories:
 - get_groundedness_engine
 - get_governed_generation_service (composes the above)
 """
-
 from __future__ import annotations
 
 from typing import Any, Dict, Optional, Set
@@ -21,14 +20,11 @@ from typing import Any, Dict, Optional, Set
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
-from app.core.contracts import PolicyRepo, EvidenceRepo, AuditRepo
+from app.core.contracts import AuditRepo, EvidenceRepo, PolicyRepo
 from app.db.session import get_db
-from app.repos.policy_repo import SqlAlchemyPolicyRepo
-from app.repos.evidence_repo import SqlAlchemyEvidenceRepo
-from app.repos.audit_repo import SqlAlchemyAuditRepo
-from app.services.decision_service import protect, ProtectResult
+from app.services.decision_service import ProtectResult, protect
 
-# Type imports for return annotations (constructed in factories)
+# Optional imports are guarded to avoid hard failures when optional deps aren't present
 try:  # Optional at import time; concrete implementations may not be used in all contexts
     from app.services.llm_gateway import LLMClient, OllamaLLMClient  # type: ignore
 except Exception:  # pragma: no cover
@@ -50,7 +46,6 @@ try:
 except Exception:  # pragma: no cover
     GroundednessEngine = Any  # type: ignore
 
-
 __all__ = [
     # repos
     "get_policy_repo",
@@ -68,25 +63,24 @@ __all__ = [
     "get_governed_generation_service",
 ]
 
-
 # -------------------------------
 # Repository Providers
 # -------------------------------
 
 def get_policy_repo(db: Session = Depends(get_db)) -> PolicyRepo:
     """Provide a PolicyRepo bound to the current DB session."""
-    return SqlAlchemyPolicyRepo(db)
-
+    from app.repos.policy_repo import SqlAlchemyPolicyRepo
+    return SqlAlchemyPolicyRepo(db)  # type: ignore[return-value]
 
 def get_evidence_repo(db: Session = Depends(get_db)) -> EvidenceRepo:
     """Provide an EvidenceRepo bound to the current DB session."""
-    return SqlAlchemyEvidenceRepo(db)
-
+    from app.repos.evidence_repo import SqlAlchemyEvidenceRepo
+    return SqlAlchemyEvidenceRepo(db)  # type: ignore[return-value]
 
 def get_audit_repo(db: Session = Depends(get_db)) -> AuditRepo:
     """Provide an AuditRepo bound to the current DB session."""
-    return SqlAlchemyAuditRepo(db)
-
+    from app.repos.audit_repo import SqlAlchemyAuditRepo
+    return SqlAlchemyAuditRepo(db)  # type: ignore[return-value]
 
 # -------------------------------
 # Decision Service
@@ -127,61 +121,53 @@ class DecisionService:
             metadata=metadata,
         )
 
-
 def get_decision_service(
     policy_repo: PolicyRepo = Depends(get_policy_repo),
     evidence_repo: EvidenceRepo = Depends(get_evidence_repo),
     audit_repo: AuditRepo = Depends(get_audit_repo),
 ) -> DecisionService:
-    """Provide a DecisionService constructed from the repo dependencies."""
+    """Provide a DecisionService with bound repositories."""
     return DecisionService(policy_repo=policy_repo, evidence_repo=evidence_repo, audit_repo=audit_repo)
 
-
 # -------------------------------
-# LLM / RAG / Ledger / Groundedness Providers
+# Optional service providers (LLM/RAG/Ledger/Groundedness)
 # -------------------------------
 
 def get_llm_client() -> LLMClient:  # type: ignore[valid-type]
-    """Provide a default LLM client (Ollama-based) suitable for local development."""
-    if OllamaLLMClient is None:  # pragma: no cover
-        raise RuntimeError("OllamaLLMClient unavailable; ensure dependencies are installed")
-    return OllamaLLMClient()
-
+    """
+    Return an LLM client instance. Selection can be extended to read from settings.
+    Default is a no-op or Ollama client if available.
+    """
+    if OllamaLLMClient is not None:
+        return OllamaLLMClient()  # type: ignore[call-arg]
+    # Fallback placeholder; callers should handle capabilities accordingly.
+    return LLMClient  # type: ignore[return-value]
 
 def get_rag_proxy() -> RAGProxy:  # type: ignore[valid-type]
-    """Provide a RAGProxy instance (in-memory)."""
-    return RAGProxy()
-
+    return RAGProxy()  # type: ignore[call-arg]
 
 def get_governance_ledger() -> GovernanceLedger:  # type: ignore[valid-type]
-    """Provide a GovernanceLedger instance with settings-based configuration."""
-    return GovernanceLedger()
-
+    return GovernanceLedger()  # type: ignore[call-arg]
 
 def get_groundedness_engine() -> GroundednessEngine:  # type: ignore[valid-type]
-    """Provide a GroundednessEngine with default threshold."""
-    return GroundednessEngine()
-
+    return GroundednessEngine()  # type: ignore[call-arg]
 
 # -------------------------------
-# Governed Generation Orchestrator
+# Governed generation service
 # -------------------------------
 
 def get_governed_generation_service(
     decision_service: DecisionService = Depends(get_decision_service),
-    llm_client: LLMClient = Depends(get_llm_client),  # type: ignore[valid-type]
-    groundedness_engine: GroundednessEngine = Depends(get_groundedness_engine),  # type: ignore[valid-type]
-    rag_proxy: RAGProxy = Depends(get_rag_proxy),  # type: ignore[valid-type]
-    ledger: GovernanceLedger = Depends(get_governance_ledger),  # type: ignore[valid-type]
 ):
-    """Compose GovernedGenerationService from its parts using local imports to avoid cycles."""
-    # Local import to avoid circular import at module load time
+    """
+    Provide a GovernedGenerationService instance wired with optional dependencies.
+    Kept loosely typed here to avoid import-time hard deps.
+    """
     from app.services.governed_generation_service import GovernedGenerationService
-
     return GovernedGenerationService(
+        llm_client=get_llm_client(),
+        rag_proxy=get_rag_proxy(),
+        ledger=get_governance_ledger(),
+        groundedness_engine=get_groundedness_engine(),
         decision_service=decision_service,
-        llm_client=llm_client,
-        groundedness_engine=groundedness_engine,
-        rag_proxy=rag_proxy,
-        ledger=ledger,
     )

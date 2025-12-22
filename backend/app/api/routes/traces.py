@@ -118,7 +118,8 @@ def get_trace(
         "input_hash": req.input_hash,
         "user_agent": req.user_agent,
         "client_ip": req.client_ip,
-        "metadata": req.metadata,
+        # Use metadata_json to avoid SQLAlchemy Base.metadata (MetaData) serialization issues
+        "metadata": getattr(req, "metadata_json", None),
         "created_at": req.created_at,
     }
 
