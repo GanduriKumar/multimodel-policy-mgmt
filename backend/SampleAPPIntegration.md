@@ -15,7 +15,7 @@ Files
 
 Prerequisites
 - Backend running locally:
-  - make run (see [backend/Makefile](backend/Makefile))
+  - make run (see [backend/Makefile](backend/Makefile) and [backend/Makefile.md](backend/Makefile.md))
   - or: python -m uvicorn app.main:app --reload --port 8000
 - Policy exists and has an active version (see [backend/CreatePolicy.md](backend/CreatePolicy.md))
 - Environment:
@@ -43,19 +43,6 @@ Run
 - JSON output (includes pre/post decisions and content):
   - echo "Hello" | python backend/SampleAppIntegration.py --tenant-id 1 --policy-slug content-safety --json
 
-Alternative: one-call orchestration
-- Let the backend pre-check, call the LLM, run safety checks, and post-check in one request:
-```bash
-curl -X POST http://localhost:8000/api/protect-generate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tenant_id": 1,
-    "policy_slug": "content-safety",
-    "user_input": "Draft a brief policy summary.",
-    "llm": { "provider": "openai", "model": "gpt-4o-mini" }
-  }'
-```
-
 Options (CLI)
 - --tenant-id: Tenant identifier used by backend policies
 - --policy-slug: Policy slug to enforce (e.g., content-safety)
@@ -66,13 +53,37 @@ Options (CLI)
 - --openai-api-key / --openai-model: LLM provider credentials and model
 - --json: Emit a machine-readable JSON result
 
-What to expect
-- If pre-check denies, the script exits with a clear message and reasons.
-- If pre-check allows, the script calls OpenAI and then post-checks the output.
-- If post-check denies, reasons explain which rule triggered.
-- On success, the final content is printed (or a JSON blob when --json is set).
+Alternative: one-call orchestration
+- Let the backend pre-check, call the LLM, run safety checks, and post-check in one request.
+- Endpoint: POST /api/protect-generate
+- Schema: [backend/app/schemas/generation.py](backend/app/schemas/generation.py)
+- Service: [backend/app/services/governed_generation_service.py](backend/app/services/governed_generation_service.py)
+
+Example
+```bash
+curl -X POST http://localhost:8000/api/protect-generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tenant_id": 1,
+    "policy_slug": "content-safety",
+    "input_text": "Draft a brief policy summary.",
+    "evidence_types": [],
+    "retrieval_query": "policy overview",
+    "llm": { "provider": "openai", "model": "gpt-4o-mini" }
+  }'
+```
+
+Response (shape)
+- allowed: boolean
+- risk_score: number
+- policy_reasons: string[]
+- risk_reasons: string[]
+- grounded_claims: array of claims with scores
+- raw_model_output: string
+- trace_id: string
 
 Troubleshooting
 - 400/500 from /api/protect: ensure tenant_id, policy_slug, and input_text are set and backend is running.
+- 400/500 from /api/protect-generate: ensure payload uses input_text (not user_input), and optional fields match the schema.
 - Empty output: ensure OPENAI_API_KEY is configured and your model name is valid.
 - CORS or auth errors (for web apps): use the correct API key header name; see settings in backend.
