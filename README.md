@@ -1,263 +1,177 @@
-# Multimodel Policy Management (Monorepo)
+# 1. Introduction
 
-This project helps you set simple “policies” for AI apps. A policy is just a set of rules (like “block these words” or “require a URL as evidence”) that you can create, version, activate, and use to allow or block content.
+Multimodel Policy Management helps you define, version, activate, and enforce simple “policies” for AI apps. Policies can block terms, require evidence, and incorporate a risk engine. The system logs requests/decisions for audit and supports an optional governance ledger.
 
-If you’re new to this, don’t worry—this guide uses everyday language and shows exactly what to click or type.
-
-What’s in here
-- Backend (FastAPI): the policy and decision engine
+Key components (monorepo):
+- Backend (FastAPI): decision flow, policy/risk engines, evidence, audit
   - App entry: [backend/app/main.py](backend/app/main.py)
-  - API router: [backend/app/api/router.py](backend/app/api/router.py)
-  - Routes:
-    - Policies: [backend/app/api/routes/policies.py](backend/app/api/routes/policies.py)
-      - Key handlers: [`app.api.routes.policies.create_policy`](backend/app/api/routes/policies.py), [`app.api.routes.policies.list_policies`](backend/app/api/routes/policies.py), [`app.api.routes.policies.add_policy_version`](backend/app/api/routes/policies.py)
-    - Protect (check text): [backend/app/api/routes/protect.py](backend/app/api/routes/protect.py)
-    - Protect & Generate (one call): [backend/app/api/routes/protect_generate.py](backend/app/api/routes/protect_generate.py)
-    - Evidence: [backend/app/api/routes/evidence.py](backend/app/api/routes/evidence.py)
-    - Audit: [backend/app/api/routes/audit.py](backend/app/api/routes/audit.py)
-  - Services (how decisions are made):
-    - Policy engine: [backend/app/services/policy_engine.py](backend/app/services/policy_engine.py)
-    - Decision orchestration: [backend/app/services/decision_service.py](backend/app/services/decision_service.py)
-    - Risk engine: [backend/app/services/risk_engine.py](backend/app/services/risk_engine.py)
-    - One-call orchestration: [backend/app/services/governed_generation_service.py](backend/app/services/governed_generation_service.py)
-  - Repos (data access):
-    - Policies: [backend/app/repos/policy_repo.py](backend/app/repos/policy_repo.py) (see [`app.repos.policy_repo.SqlAlchemyPolicyRepo.update_policy`](backend/app/repos/policy_repo.py))
-- Frontend (React + Vite): a simple UI to manage and test
-  - Pages: Policies [frontend/src/pages/Policies.tsx](frontend/src/pages/Policies.tsx), Protect [frontend/src/pages/Protect.tsx](frontend/src/pages/Protect.tsx), Evidence [frontend/src/pages/Evidence.tsx](frontend/src/pages/Evidence.tsx), Audit [frontend/src/pages/Audit.tsx](frontend/src/pages/Audit.tsx)
-  - Policies hook: [frontend/src/hooks/usePolicies.ts](frontend/src/hooks/usePolicies.ts)
-
-Helpful how-to docs
-- Makefile run guide: [backend/Makefile.md](backend/Makefile.md)
-- Create policies (step-by-step): [backend/CreatePolicy.md](backend/CreatePolicy.md)
-- Deploy & integrate: [backend/Deploy&Integrate.md](backend/Deploy&Integrate.md)
-- Sample app integration: [backend/SampleAPPIntegration.md](backend/SampleAPPIntegration.md), script [backend/SampleAppIntegration.py](backend/SampleAppIntegration.py)
-
-Policies in plain English
-- Tenant: the “workspace” that owns policies.
-- Policy: a named container (has many versions).
-- Version: a snapshot of rules. You don’t edit a version in place—create a new one and activate it.
-- Only one version is active at a time.
-
-Quick start
-
-Backend
-- Create venv and install
-  - macOS/Linux:
-    - cd backend && python -m venv .venv && source .venv/bin/activate
-  - Windows (PowerShell):
-    - cd backend && python -m venv .venv; .\.venv\Scripts\Activate.ps1
-  - Install deps:
-    - pip install -r requirements.txt (or pip install -e .)
-- Initialize the DB (no migrations for now)
-  - cd backend
-  - python -c "from app.db.base import Base, import_all_models; from app.db.session import engine; import_all_models(); Base.metadata.create_all(bind=engine)"
-- Run the API
-  - make run (see [backend/Makefile](backend/Makefile) and [backend/Makefile.md](backend/Makefile.md))
-  - or: python -m uvicorn app.main:app --reload --port 8000
-- Verify
-  - Health: http://localhost:8000/api/health
-  - Docs: http://localhost:8000/docs
-
-Frontend
-- cd frontend && npm install && npm run dev
-- Open http://localhost:5173
-- Ensure VITE_API_BASE_URL points to your backend (see frontend/.env.example)
-
-Policies from the command line (CLI)
-
-You can manage policies using curl. Replace values with your own.
-
-1) Create a policy
-- Endpoint: POST /api/policies
-- Handler: [`app.api.routes.policies.create_policy`](backend/app/api/routes/policies.py)
-
-```bash
-curl -X POST http://localhost:8000/api/policies \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tenant_id": 1,
-    "name": "Content Safety",
-    "slug": "content-safety",
-    "description": "Blocks unsafe words",
-    "is_active": true
-  }'
-```
-
-2) Modify (rules) by adding a new version
-- Endpoint: POST /api/policies/{policy_id}/versions
-- Handler: [`app.api.routes.policies.add_policy_version`](backend/app/api/routes/policies.py)
-- Important: Include policy_id in the body and it must match the URL; otherwise the API returns 400.
-
-```bash
-POLICY_ID=1
-curl -X POST http://localhost:8000/api/policies/$POLICY_ID/versions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "policy_id": '"$POLICY_ID"',
-    "document": {
-      "blocked_terms": ["forbidden", "secret sauce"],
-      "allowed_sources": [],
-      "required_evidence_types": ["url"],
-      "pii_rules": { "mask_emails": true },
-      "risk_threshold": 50
-    },
-    "is_active": true
-  }'
-```
-
-3) Activate a specific version
-- Endpoint: POST /api/policies/{policy_id}/versions/{version}/activate
-- Handler: [`app.api.routes.policies.set_active_version`](backend/app/api/routes/policies.py)
-
-```bash
-curl -X POST http://localhost:8000/api/policies/1/versions/2/activate
-```
-
-4) Update policy metadata (name, slug, description, is_active)
-- Current public HTTP routes do not expose “update policy” yet.
-- Internals support it via [`app.repos.policy_repo.SqlAlchemyPolicyRepo.update_policy`](backend/app/repos/policy_repo.py), but there is no HTTP endpoint.
-- Practical approach today:
-  - For rule changes: create a new version (step 2) and activate it (step 3).
-  - To “retire” usage: mark clients to use a different policy, or create a version that blocks all content.
-- If you need true metadata updates right now, add an API route wired to `update_policy` in [backend/app/api/routes/policies.py](backend/app/api/routes/policies.py), or run an admin task against the repo. The UI does not expose metadata editing yet.
-
-5) Delete a policy
-- There is no public HTTP “delete policy” endpoint at the moment.
-- Internals have delete helpers (see repo layer in [backend/app/repos/policy_repo.py](backend/app/repos/policy_repo.py)), but they’re not routed.
-- Practical workaround:
-  - “Retire” the policy by moving clients to another policy and/or deactivating its practical use (e.g., keep it but stop referencing its slug).
-  - If you must hard-delete, add an admin-only route that calls the repo delete method, or use a maintenance script (not provided here).
-
-6) List policies
-- Endpoint: GET /api/policies?tenant_id=...&offset=...&limit=...
-- Handler: [`app.api.routes.policies.list_policies`](backend/app/api/routes/policies.py)
-
-```bash
-curl "http://localhost:8000/api/policies?tenant_id=1&offset=0&limit=50"
-```
-
-7) Check text against the active policy
-- Endpoint: POST /api/protect
-- Service: [`app.services.decision_service.protect`](backend/app/services/decision_service.py)
-
-```bash
-curl -X POST http://localhost:8000/api/protect \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tenant_id": 1,
-    "policy_slug": "content-safety",
-    "input_text": "this contains a forbidden word",
-    "evidence_types": []
-  }'
-```
-
-Optional: one-call Protect & Generate
-- Endpoint: POST /api/protect-generate
-- Service: [`app.services.governed_generation_service.GovernedGenerationService`](backend/app/services/governed_generation_service.py)
-
-```bash
-curl -X POST http://localhost:8000/api/protect-generate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tenant_id": 1,
-    "policy_slug": "content-safety",
-    "input_text": "Summarize our policy.",
-    "llm": { "provider": "openai", "model": "gpt-4o-mini" }
-  }'
-```
-
-Policies from the frontend UI
-
-Open the app
-- Start the frontend: cd frontend && npm install && npm run dev
-- Open http://localhost:5173
-- Make sure VITE_API_BASE_URL points at your backend.
-
-1) Create a policy (UI)
-- Go to “Policies” (top navigation) [frontend/src/pages/Policies.tsx](frontend/src/pages/Policies.tsx)
-- In the “Create Policy” card:
-  - Fill Name, Slug, Description (optional), Active
-  - Click “Create Policy”
-- The new policy appears in the table (hook: [`frontend/src/hooks/usePolicies.ts`](frontend/src/hooks/usePolicies.ts))
-
-2) Modify rules by adding a version (UI)
-- In the policy row’s “Versioning” area:
-  - Paste Version JSON (example below)
-  - Check “Active” to activate immediately (or uncheck to keep inactive)
-  - Click “Add Version”
-- Example JSON to paste:
-```json
-{
-  "blocked_terms": ["forbidden", "secret sauce"],
-  "allowed_sources": [],
-  "required_evidence_types": ["url"],
-  "pii_rules": { "mask_emails": true },
-  "risk_threshold": 50
-}
-```
-
-3) Activate a specific version (UI)
-- Enter the version number in “Version # to activate”
-- Click “Activate”
-- The backend will mark that version active and deactivate others
-
-4) Update policy metadata (UI)
-- Not supported in the UI yet (no form to rename slug/name or change description after creation).
-- Workaround: treat policy metadata as stable; change rules by creating a new version and activating it.
-
-5) Delete a policy (UI)
-- Not supported in the UI.
-- Workaround: stop using that policy’s slug in clients, and/or create a version that blocks everything (effectively “retired”).
-
-6) Test your policy quickly (UI)
-- Go to “Protect” [frontend/src/pages/Protect.tsx](frontend/src/pages/Protect.tsx)
-  - Enter Tenant ID, Policy Slug, and Input Text
-  - Submit to see allowed (true/false) and reasons
-
-What the UI supports now
-- Create policy, list policies, add versions, activate a version, try Protect
-- Evidence and Audit pages are also available:
-  - Evidence: [frontend/src/pages/Evidence.tsx](frontend/src/pages/Evidence.tsx)
-  - Audit: [frontend/src/pages/Audit.tsx](frontend/src/pages/Audit.tsx)
-
-Policy document shape
-
-Policies are validated by [`app.schemas.policy_format.PolicyDoc`](backend/app/schemas/policy_format.py). Common fields:
-- blocked_terms: list[string]
-- allowed_sources: list[string]
-- required_evidence_types: list[string]
-- pii_rules: dict
-- risk_threshold: number 0–100
-
-Under the hood
-
-- Routes (thin): see [backend/app/api/routes/policies.py](backend/app/api/routes/policies.py)
-- Decision flow: [`app.services.decision_service.protect`](backend/app/services/decision_service.py) calls the policy and risk engines:
+  - Router aggregator: [backend/app/api/router.py](backend/app/api/router.py)
+  - Decision orchestration: [`app.services.decision_service.protect`](backend/app/services/decision_service.py)
   - Policy engine: [backend/app/services/policy_engine.py](backend/app/services/policy_engine.py)
   - Risk engine: [backend/app/services/risk_engine.py](backend/app/services/risk_engine.py)
-- One-call orchestration: [backend/app/services/governed_generation_service.py](backend/app/services/governed_generation_service.py)
+  - One-call orchestrator: [backend/app/services/governed_generation_service.py](backend/app/services/governed_generation_service.py)
+- Frontend (React + Vite): simple UI to manage policies, evaluate text, inspect audit
+  - Protect page: [frontend/src/pages/Protect.tsx](frontend/src/pages/Protect.tsx)
+  - Evidence page: [frontend/src/pages/Evidence.tsx](frontend/src/pages/Evidence.tsx)
+  - Audit page: [frontend/src/pages/Audit.tsx](frontend/src/pages/Audit.tsx)
+  - Policies hook: [frontend/src/hooks/usePolicies.ts](frontend/src/hooks/usePolicies.ts)
 
-CLI helpers (backend)
-- Evaluate a policy file against input text:
-  - echo "text" | python -m app.tools.run_policy --policy path/to/policy.json ([backend/app/tools/run_policy.py](backend/app/tools/run_policy.py))
-- Compute a risk score:
-  - echo "text" | python -m app.tools.run_risk --evidence-present ([backend/app/tools/run_risk.py](backend/app/tools/run_risk.py))
+Helpful docs:
+- Deploy & integrate: [backend/Deploy&Integrate.md](backend/Deploy&Integrate.md)
+- Create policies (step-by-step): [backend/CreatePolicy.md](backend/CreatePolicy.md)
+- Makefile run guide: [backend/Makefile.md](backend/Makefile.md)
 
-Running tests (backend)
-- From repo root or backend: pytest -q
-- With Makefile: cd backend && make test (see [backend/Makefile](backend/Makefile))
+---
 
-Deploy basics
-See the step-by-step guide in [backend/Deploy&Integrate.md](backend/Deploy&Integrate.md). Quick pointers:
-- Run with Uvicorn:
-  - python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
-- Docker (example):
-  - docker build -t policy-backend -f Dockerfile .
-  - docker run -d -p 8000:8000 -e DATABASE_URL=sqlite:///./app.db -e ALLOW_ORIGINS=* policy-backend
-- Health: GET /api/health; Version: GET /api/version
+# 2. Getting started
 
-Notes and tips
-- You don’t edit an existing version. Create a new version and activate it so there’s a clear history and easy rollback.
-- When adding a version via the API, policy_id in the JSON body must match the URL path, by design in [`app.api.routes.policies.add_policy_version`](backend/app/api/routes/policies.py).
-- Only one version is active per policy.
-- For metadata update/delete, public HTTP endpoints are intentionally minimal right now; plan workflows around versioning until those routes are added.
+Prerequisites
+- Python 3.10+
+- Node.js 18+ and npm
+- Git
+
+Clone and install
+- Backend
+  - cd backend
+  - python -m venv .venv && source .venv/bin/activate  (Windows: .\.venv\Scripts\Activate.ps1)
+  - pip install -r requirements.txt  (or: pip install -e .)
+  - Initialize DB (SQLite default):
+    - python -c "from app.db.base import Base, import_all_models; from app.db.session import engine; import_all_models(); Base.metadata.create_all(bind=engine)"
+- Frontend
+  - cd frontend && npm install
+
+Environment
+- Backend config: [backend/app/core/config.py](backend/app/core/config.py)
+  - DATABASE_URL or DB_URL (default sqlite:///./app.db)
+  - API_KEY_HEADER (default x-api-key)
+  - DEFAULT_RISK_THRESHOLD
+- Frontend config: [frontend/.env.example](frontend/.env.example)
+  - VITE_API_BASE_URL=http://localhost:8000
+
+---
+
+# 3. How to start the backend service
+
+Option A — Makefile (recommended)
+- cd backend && make run
+  - Starts: uvicorn app.main:app --reload --port 8000
+
+Option B — Raw uvicorn
+- cd backend && python -m uvicorn app.main:app --reload --port 8000
+
+Verify
+- Health: http://localhost:8000/api/health
+- Docs: http://localhost:8000/docs
+- Version: http://localhost:8000/api/version
+
+Notes
+- CORS is configured in [`app.main.get_application`](backend/app/main.py).
+- API key header name comes from settings; see [backend/app/core/config.py](backend/app/core/config.py) and auth helpers in [backend/app/core/auth.py](backend/app/core/auth.py).
+- Make targets: [backend/Makefile](backend/Makefile), guide: [backend/Makefile.md](backend/Makefile.md).
+
+---
+
+# 4. How to use the frontend service
+
+- cd frontend && npm install && npm run dev
+- Open http://localhost:5173
+- Ensure VITE_API_BASE_URL points to the backend (see [frontend/.env.example](frontend/.env.example)).
+
+Pages
+- Protect: try POST /api/protect flows ([frontend/src/pages/Protect.tsx](frontend/src/pages/Protect.tsx))
+- Policies: create/list/add versions/activate (see hooks in [frontend/src/hooks/usePolicies.ts](frontend/src/hooks/usePolicies.ts))
+- Evidence: ingest and fetch ([frontend/src/pages/Evidence.tsx](frontend/src/pages/Evidence.tsx))
+- Audit: list requests and view decision details ([frontend/src/pages/Audit.tsx](frontend/src/pages/Audit.tsx))
+
+---
+
+# 5. Sample test application and integration with backend with REST API integration
+
+Python sample app
+- Runner script: [backend/SampleAppIntegration.py](backend/SampleAppIntegration.py)
+- Flow:
+  1) Pre-check user input via POST /api/protect
+  2) Call LLM (OpenAI REST)
+  3) Post-check the model output via POST /api/protect
+- Core call: [`app.services.decision_service.protect`](backend/app/services/decision_service.py) is the backend’s orchestrator.
+
+Usage
+- Prompt via arg:
+  - python backend/SampleAppIntegration.py --tenant-id 1 --policy-slug content-safety --prompt "Hello!"
+- Prompt via STDIN:
+  - echo "Summarize..." | python backend/SampleAppIntegration.py --tenant-id 1 --policy-slug content-safety
+
+Minimal curl examples
+- Create policy:
+  - See examples in [backend/CreatePolicy.md](backend/CreatePolicy.md)
+- Check text:
+  - curl -X POST http://localhost:8000/api/protect -H "Content-Type: application/json" -d '{"tenant_id":1,"policy_slug":"content-safety","input_text":"some text","evidence_types":[]}'
+
+JS/TS snippet (from docs)
+- End-to-end sandwich pattern is shown in [backend/Deploy&Integrate.md](backend/Deploy&Integrate.md)
+
+---
+
+# 6. Details of Backend API
+
+Router entry
+- Aggregator: [backend/app/api/router.py](backend/app/api/router.py)
+- App factory: [backend/app/main.py](backend/app/main.py)
+
+Policies
+- File: [backend/app/api/routes/policies.py](backend/app/api/routes/policies.py)
+- Endpoints (high level):
+  - POST /api/policies  (create)
+  - GET /api/policies?tenant_id=...&offset=...&limit=...  (list)
+  - POST /api/policies/{policy_id}/versions  (add version; body must include matching policy_id)
+  - POST /api/policies/{policy_id}/versions/{version}/activate  (activate one version)
+- Policy doc shape: [backend/app/schemas/policy_format.py](backend/app/schemas/policy_format.py)
+
+Protect (evaluate text)
+- File: [backend/app/api/routes/protect.py](backend/app/api/routes/protect.py)
+- Service: [`app.services.decision_service.protect`](backend/app/services/decision_service.py)
+- Endpoint:
+  - POST /api/protect
+  - Request: tenant_id, policy_slug, input_text, evidence_types (optional)
+  - Response: allowed, reasons, risk_score, and log IDs
+
+Protect & Generate (one call)
+- File: [backend/app/api/routes/protect_generate.py](backend/app/api/routes/protect_generate.py)
+- Schema: [backend/app/schemas/generation.py](backend/app/schemas/generation.py)
+- Service: [backend/app/services/governed_generation_service.py](backend/app/services/governed_generation_service.py)
+- Endpoint: POST /api/protect-generate
+
+Evidence
+- File: [backend/app/api/routes/evidence.py](backend/app/api/routes/evidence.py)
+- Typical endpoints:
+  - POST /api/evidence?tenant_id=... (ingest)
+  - GET /api/evidence/{id}?tenant_id=... (fetch)
+- Tests: [backend/tests/test_api_evidence.py](backend/tests/test_api_evidence.py)
+
+Audit
+- File: [backend/app/api/routes/audit.py](backend/app/api/routes/audit.py)
+- Typical endpoints:
+  - GET /api/audit/requests?tenant_id=...&offset=...&limit=... (list)
+  - GET /api/audit/decisions/{request_id}?tenant_id=... (detail)
+- Traces (correlation helper): [backend/app/api/routes/traces.py](backend/app/api/routes/traces.py)
+
+Governance and compliance (optional)
+- Governance ledger: [backend/app/services/governance_ledger.py](backend/app/services/governance_ledger.py)
+- Compliance export service: [backend/app/services/compliance_export.py](backend/app/services/compliance_export.py)
+
+Security and config
+- API key header name and secrets: [backend/app/core/config.py](backend/app/core/config.py), [backend/app/core/auth.py](backend/app/core/auth.py)
+
+---
+
+# 7. Licensing and credits
+
+License
+- MIT, see [LICENSE](LICENSE)
+
+Credits
+- Author: KumarGN (2025)
+- Built with:
+  - FastAPI, Pydantic, SQLAlchemy (backend)
+  - React, Vite, TypeScript (frontend)
+- Engineering guidelines: [constitution.md](constitution.md)
