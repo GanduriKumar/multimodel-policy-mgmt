@@ -16,18 +16,35 @@ What this is
 - A policy‑first safety layer you can put between your app and any LLM.
 - Define simple JSON policies, version them, activate one version at a time.
 - Check text against policies, compute a heuristic risk score, and log every decision for audit.
-- Optional tamper‑evident governance ledger and RAG trace capture.
+- Optional tamper‑evident governance ledger and retrieval traces for compliance.
+- Beginner‑friendly UI (create/list/activate policies, evaluate text, ingest evidence, browse/export audit).
 
-What’s different from typical tools
-- Versioned policies that are easy to reason about (no black‑box config).
-- Simple, deterministic engines (policy, risk, groundedness, safety) you can read and test.
-- Clean separation of concerns: route → service → repo/engine; easy to swap adapters.
-- Beginner‑friendly UI (create/list/activate policies, evaluate text, ingest evidence, browse audit).
-- Compliance‑ready exports (JSON/HTML bundles with hashes) via [`ComplianceExportService`](backend/app/services/compliance_export.py).
+What’s different from typical tools today
+- Policy once, apply everywhere:
+  - You can encode enterprise, domain, and regulatory policies once and enforce them across multiple applications and multiple LLM providers.
+  - Providers are pluggable via the gateway abstraction in [backend/app/services/llm_gateway.py](backend/app/services/llm_gateway.py) (Ollama, OpenAI today).
+- Deterministic, inspectable engines:
+  - Policy engine, risk engine, groundedness and safety checks are clear and testable. See:
+    - Policy engine: [backend/app/services/policy_engine.py](backend/app/services/policy_engine.py)
+    - Risk engine: [backend/app/services/risk_engine.py](backend/app/services/risk_engine.py)
+    - Groundedness: [backend/app/services/groundedness_engine.py](backend/app/services/groundedness_engine.py)
+    - Response safety: [backend/app/services/response_safety_engine.py](backend/app/services/response_safety_engine.py)
+- Audit‑ready by design:
+  - Every request and decision is captured via the audit repository contracts in [`app.core.contracts.AuditRepo`](backend/app/core/contracts.py).
+  - Optional tamper‑evident ledger for immutable evidence trails: [`app.services.governance_ledger.GovernanceLedger`](backend/app/services/governance_ledger.py).
+  - One‑click compliance exports (JSON or HTML) via [`app.services.compliance_export.ComplianceExportService`](backend/app/services/compliance_export.py).
+- Clean layering (route → service → repo/engine):
+  - Routes contain no business logic (see [backend/app/api/README.md](backend/app/api/README.md)).
+  - Swappable adapters behind Protocol ports (see [backend/app/core/contracts.py](backend/app/core/contracts.py)).
 
-What this is not
-- Not a vendor‑locked gateway. It’s framework code you can extend or replace.
-- Not a complex rule engine—intentionally minimal to keep it transparent and testable.
+How it helps in an enterprise
+- Centralized policy: encode regulations and business rules once; apply across teams and apps.
+- Multi‑provider: enforce the same guardrails across different LLMs without per‑app rewrites.
+- Compliance reporting:
+  - Exportable, machine‑verifiable JSON and PDF‑ready HTML bundles with section hashes: [`ComplianceExportService`](backend/app/services/compliance_export.py).
+  - Append‑only, hash‑chained ledger for immutable evidence: [`GovernanceLedger`](backend/app/services/governance_ledger.py).
+- Traceability:
+  - Inspect requests, decisions, risk, and supporting evidence through the Audit UI and APIs.
 
 ---
 
@@ -73,8 +90,7 @@ Frontend setup (React + Vite)
 ```bash
 cd frontend
 npm install
-# Configure API base URL if needed
-cp .env.example .env   # edit VITE_API_BASE_URL if backend is not on localhost:8000
+cp .env.example .env   # edit VITE_API_BASE_URL if backend isn't on http://localhost:8000
 npm run dev            # opens http://localhost:5173
 ```
 
@@ -88,17 +104,20 @@ Configuration (env)
   - DATABASE_URL or DB_URL (default sqlite:///./app.db)
   - API_KEY_HEADER (default x-api-key)
   - DEFAULT_RISK_THRESHOLD (default 80)
-  - Governance ledger (optional): GOVERNANCE_LEDGER_PATH, GOVERNANCE_LEDGER_HMAC_SECRET
+  - OPENAI_API_KEY and OPENAI_MODEL (for OpenAI gateway)
+  - OLLAMA_BASE_URL and OLLAMA_MODEL (for Ollama gateway)
+  - GOVERNANCE_LEDGER_PATH, GOVERNANCE_LEDGER_HMAC_SECRET (optional governance ledger)
 - Frontend settings: [frontend/.env.example](frontend/.env.example)
   - VITE_API_BASE_URL=http://localhost:8000
   - VITE_API_KEY (optional if backend enforces API keys)
 
-Tests and lint (backend)
+Makefile helpers (backend)
 ```bash
 cd backend
-make test        # all tests
+make run         # start API with reload
+make test        # run all backend tests
 make test-api    # API tests only
-make lint        # Ruff checks
+make lint        # Ruff lint checks
 make format      # Apply Ruff formatting
 ```
 
@@ -106,15 +125,50 @@ make format      # Apply Ruff formatting
 
 ## 3) How to use the backend services
 
-Integration patterns
-- Pre‑check (recommended): Call the backend before sending user text to an LLM.
-- Sandwich: Pre‑check user text and post‑check the model output before showing it.
-- One‑call: Let the backend do pre‑check, call the LLM, run safety/groundedness, post‑check.
+Core concepts
+- Policies are versioned JSON documents validated by [`app.schemas.policy_format.PolicyDoc`](backend/app/schemas/policy_format.py).
+- The protect flow orchestrates policy evaluation and risk scoring via [`app.services.decision_service.protect`](backend/app/services/decision_service.py).
+- The one‑call orchestrator also handles LLM calls, groundedness, and safety via [`app.services.governed_generation_service`](backend/app/services/governed_generation_service.py).
 
-Python example (simple pre‑check) using urllib (no extra deps)
+Schemas
+- Protect request/response: [backend/app/schemas/protect.py](backend/app/schemas/protect.py)
+- Protect‑Generate request/response: [backend/app/schemas/generation.py](backend/app/schemas/generation.py)
+- Policy document shape: [backend/app/schemas/policy_format.py](backend/app/schemas/policy_format.py)
+
+Calling the Protect API (pre/post checks)
+- Route: [backend/app/api/routes/protect.py](backend/app/api/routes/protect.py)
+- Endpoint: POST /api/protect
+- Request fields (ProtectRequest)
+  - tenant_id: number — Your tenant/workspace id.
+  - policy_slug: string — The policy to enforce.
+  - input_text: string — The content to evaluate.
+  - evidence_types?: string[] — Tags such as "url" or "document".
+- Response (ProtectResponse)
+  - allowed: boolean — Final decision.
+  - reasons: string[] — Human‑readable reasons (policy or risk).
+  - risk_score: number — 0–100 heuristic risk score.
+  - request_log_id?: number — Audit reference.
+  - decision_log_id?: number — Audit reference.
+
+cURL examples
+```bash
+# Pre-check user input
+curl -X POST http://localhost:8000/api/protect \
+  -H "Content-Type: application/json" \
+  -d '{"tenant_id":1,"policy_slug":"content-safety","input_text":"some text","evidence_types":[]}'
+```
+
+# Post-check model output
+curl -X POST http://localhost:8000/api/protect \
+  -H "Content-Type: application/json" \
+  -d '{"tenant_id":1,"policy_slug":"content-safety","input_text":"draft from LLM","evidence_types":[]}'
+
+```
+
+Python (urllib, no extra deps)
 ```python
+# filepath: examples/protect_example.py
 import json, urllib.request
-
 payload = {
   "tenant_id": 1,
   "policy_slug": "content-safety",
@@ -129,25 +183,28 @@ req = urllib.request.Request(
 )
 with urllib.request.urlopen(req, timeout=30) as resp:
   result = json.loads(resp.read().decode("utf-8"))
-  print(result)  # {"allowed": true/false, "reasons": [...], "risk_score": ...}
+print(result)
 ```
 
-cURL (pre‑check and post‑check)
-```bash
-# Pre-check user input
-curl -X POST http://localhost:8000/api/protect \
-  -H "Content-Type: application/json" \
-  -d '{"tenant_id":1,"policy_slug":"content-safety","input_text":"some text","evidence_types":[]}'
-
-# Post-check model output
-curl -X POST http://localhost:8000/api/protect \
-  -H "Content-Type: application/json" \
-  -d '{"tenant_id":1,"policy_slug":"content-safety","input_text":"model draft here","evidence_types":[]}'
-```
-
-One‑call orchestration (backend calls the LLM)
+One‑call orchestration: Protect‑Generate
 - Route: [backend/app/api/routes/protect_generate.py](backend/app/api/routes/protect_generate.py)
 - Service: [`app.services.governed_generation_service`](backend/app/services/governed_generation_service.py)
+- Endpoint: POST /api/protect-generate
+- Request (subset from [`app.schemas.generation`](backend/app/schemas/generation.py))
+  - tenant_id: number (required)
+  - policy_slug: string (required)
+  - input_text: string (required)
+  - evidence_types?: string[]
+  - retrieval_query?: string
+  - evidence_payloads?: array of { text: string, source_uri?: string, metadata?: object, document_hash?: string, chunk_hash?: string }
+  - llm?: { provider?: "ollama" | "openai", model?: string }
+- Response adds:
+  - policy_reasons, risk_reasons (split reasons)
+  - grounded_claims: [{ claim: { text }, score, supported, matched_evidence_ids }]
+  - raw_model_output: string
+  - trace_id: string
+
+Example
 ```bash
 curl -X POST http://localhost:8000/api/protect-generate \
   -H "Content-Type: application/json" \
@@ -159,19 +216,24 @@ curl -X POST http://localhost:8000/api/protect-generate \
     "retrieval_query": "policy overview"
   }'
 ```
-Response includes:
-- allowed, risk_score
-- policy_reasons, risk_reasons
-- grounded_claims (scored claims)
-- raw_model_output
-- trace_id (for RAG/ledger correlation)
-Schemas: [backend/app/schemas/generation.py](backend/app/schemas/generation.py)
 
-Key backend pieces you may call or extend
-- Protect orchestration: [`app.services.decision_service.protect`](backend/app/services/decision_service.py)
-- LLM gateway (Ollama/OpenAI): [backend/app/services/llm_gateway.py](backend/app/services/llm_gateway.py)
-- RAG proxy: [backend/app/services/rag_proxy.py](backend/app/services/rag_proxy.py)
-- Governance ledger: [backend/app/services/governance_ledger.py](backend/app/services/governance_ledger.py)
+Policy documents
+- Shape: [`app.schemas.policy_format.PolicyDoc`](backend/app/schemas/policy_format.py)
+  - blocked_terms: string[] (required)
+  - allowed_sources: string[] (required)
+  - required_evidence_types: string[] (required)
+  - pii_rules: object (required)
+  - risk_threshold: number 0–100 (required)
+- CLI helper to evaluate a policy file:
+  - [`app.tools.run_policy`](backend/app/tools/run_policy.py)
+- CLI helper to compute risk from stdin:
+  - [`app.tools.run_risk`](backend/app/tools/run_risk.py)
+
+Audit exports and ledger (optional, but recommended)
+- Export service: [`ComplianceExportService`](backend/app/services/compliance_export.py)
+  - Produces JSON (machine‑verifiable with SHA‑256 hashes) and HTML (PDF‑ready) bundles.
+- Append‑only ledger: [`GovernanceLedger`](backend/app/services/governance_ledger.py)
+  - Tamper‑evident record with hash chaining; verify with [`app.tools.verify_ledger`](backend/app/tools/verify_ledger.py).
 
 ---
 
@@ -181,35 +243,39 @@ Start the UI
 - cd frontend && npm run dev → http://localhost:5173
 - Ensure VITE_API_BASE_URL points to your backend.
 
-Pages (top navigation)
+Pages (top navigation) and why they matter
+- Home
+  - Quick entry point and health overview.
+- Policies
+  - Create policy containers (name/slug/description/active).
+  - Add JSON policy versions and activate one version.
+  - Why: versioned rules let you evolve guardrails safely and keep history.
+  - Uses hook: [frontend/src/hooks/usePolicies.ts](frontend/src/hooks/usePolicies.ts)
 - Protect
   - Try POST /api/protect flows live: enter Tenant ID, Policy Slug, the text, and optional Evidence Types.
-  - See allowed, reasons, and risk score.
-- Policies
-  - Create policy (name, slug, description, active).
-  - List policies by tenant; add new versions and activate a specific version.
-  - Versions let you change rules safely (history is preserved).
+  - See allowed, reasons, and risk score to validate your policy logic.
 - Evidence
-  - Ingest evidence (url/text) your policies require and fetch by ID.
-  - Helps policies that need supporting artifacts to pass.
+  - Ingest evidence (url/text) your policies may require and fetch by ID.
+  - Why: some policies depend on supporting artifacts (e.g., citations).
+  - Uses hook: [frontend/src/hooks/useEvidence.ts](frontend/src/hooks/useEvidence.ts)
 - Audit
   - Browse requests and decision details (policy/risk reasons).
-  - Export a request’s audit bundle as JSON or HTML (PDF‑ready) via the export actions.
-
-These are the core workflows:
-1) Create a policy → add a version (JSON rules) → activate it.
-2) Use Protect to evaluate text (or use your app against the backend).
-3) Optionally ingest evidence if the policy requires it.
-4) Review what happened in Audit; export a compliance bundle if needed.
-
-Frontend API client: [frontend/src/api/client.ts](frontend/src/api/client.ts)
+  - Export compliance bundles (JSON or HTML, PDF‑ready).
+  - Why: compliance and governance—prove what happened and why.
+  - UI: [frontend/src/pages/Audit.tsx](frontend/src/pages/Audit.tsx)
 
 ---
 
 ## 5) Sample Python GenAI application and backend integration
 
-The sample shows a full “sandwich” pattern: pre‑check → call OpenAI → post‑check.
+End‑to‑end “sandwich” pattern (pre‑check → call LLM → post‑check)
 - Script: [backend/SampleAppIntegration.py](backend/SampleAppIntegration.py)
+
+What it does
+1) Pre‑checks your prompt via POST /api/protect.
+2) Calls OpenAI (needs OPENAI_API_KEY).
+3) Post‑checks the draft via POST /api/protect.
+4) Optionally use the one‑call endpoint /api/protect-generate.
 
 Run examples
 ```bash
@@ -223,11 +289,16 @@ echo "Summarize this..." | python backend/SampleAppIntegration.py --tenant-id 1 
 echo "Hello" | python backend/SampleAppIntegration.py --tenant-id 1 --policy-slug content-safety --json
 ```
 
-What it does
-1) Pre‑checks your prompt via POST /api/protect.
-2) Calls OpenAI (needs OPENAI_API_KEY).
-3) Post‑checks the draft via POST /api/protect.
 Core call in backend: [`app.services.decision_service.protect`](backend/app/services/decision_service.py)
+
+Helper calls in the sample
+- Protect call: [`protect(...)`](backend/SampleAppIntegration.py)
+- OpenAI call: [`call_openai_chat(...)`](backend/SampleAppIntegration.py)
+
+Why bi‑directional checks matter
+- Pre‑check blocks unsafe or non‑compliant prompts before they leave your app.
+- Post‑check ensures model output also respects policy, reducing compliance risk.
+- Same policies apply across apps and providers without rewriting logic.
 
 ---
 
@@ -238,32 +309,38 @@ Router entry
 - App factory: [backend/app/main.py](backend/app/main.py)
 
 Policies
-- Route file: [backend/app/api/routes/policies.py](backend/app/api/routes/policies.py)
-- Endpoints (high level):
+- Route module: [backend/app/api/routes/policies.py](backend/app/api/routes/policies.py)
+- Endpoints
   - POST /api/policies
-    - Body: { tenant_id, name, slug, description?, is_active? }
+    - Body: { tenant_id: number, name: string, slug: string, description?: string, is_active?: boolean }
+    - Creates a policy container for versions.
   - GET /api/policies?tenant_id=...&offset=...&limit=...
+    - Lists policies for a tenant; includes basic metadata.
   - POST /api/policies/{policy_id}/versions
-    - Body includes matching policy_id and a JSON “document” with rules
-    - Example policy doc schema: [backend/app/schemas/policy_format.py](backend/app/schemas/policy_format.py)
+    - Body: { policy_id: number, document: object, is_active?: boolean }
+    - Adds a new version (JSON policy doc). See schema: [backend/app/schemas/policy_format.py](backend/app/schemas/policy_format.py)
   - POST /api/policies/{policy_id}/versions/{version}/activate
-- Use cases: create/list/add version/activate a policy version.
+    - Activates that version and deactivates others.
+- Typical workflow: create → add version (document JSON) → activate.
 
 Protect (evaluate text)
-- Route file: [backend/app/api/routes/protect.py](backend/app/api/routes/protect.py)
+- Route: [backend/app/api/routes/protect.py](backend/app/api/routes/protect.py)
 - Service: [`app.services.decision_service.protect`](backend/app/services/decision_service.py)
 - Endpoint: POST /api/protect
 - Request
   - { tenant_id: number, policy_slug: string, input_text: string, evidence_types?: string[] }
 - Response
   - { allowed: boolean, reasons: string[], risk_score: number, request_log_id?: number, decision_log_id?: number }
+- Notes
+  - Reasons include both policy matching and risk rationales.
+  - Risk threshold defaults from settings; can be encoded in policy docs as well.
 
 Protect & Generate (one‑call orchestration)
 - Route: [backend/app/api/routes/protect_generate.py](backend/app/api/routes/protect_generate.py)
 - Service: [`app.services.governed_generation_service`](backend/app/services/governed_generation_service.py)
 - Endpoint: POST /api/protect-generate
 - Request (subset)
-  - { tenant_id, policy_slug, input_text, evidence_types?, retrieval_query?, evidence_payloads? }
+  - { tenant_id, policy_slug, input_text, evidence_types?, retrieval_query?, evidence_payloads?, llm? }
 - Response
   - { allowed, risk_score, policy_reasons, risk_reasons, grounded_claims, raw_model_output, trace_id }
 
@@ -271,30 +348,34 @@ Evidence
 - Route: [backend/app/api/routes/evidence.py](backend/app/api/routes/evidence.py)
 - Typical endpoints
   - POST /api/evidence?tenant_id=... (ingest)
+    - Body: { type: "url"|"text"|string, source?: string, description?: string, content?: string, policy_id?: number, policy_version_id?: number, metadata?: object }
   - GET /api/evidence/{id}?tenant_id=... (fetch)
+- Frontend hook: [frontend/src/hooks/useEvidence.ts](frontend/src/hooks/useEvidence.ts)
 
 Audit (list, detail, export)
 - Route: [backend/app/api/routes/audit.py](backend/app/api/routes/audit.py)
-- Typical endpoints
-  - GET /api/audit/requests?tenant_id=...&offset=...&limit=...
+- Endpoints
+  - GET /api/audit/requests?tenant_id=...&offset=...&limit=...&date_from=...&date_to=...&client_ip=...&user_agent=...
+    - Lists recent requests with optional filters.
   - GET /api/audit/decisions/{request_id}?tenant_id=...
+    - Returns decision detail for a specific request.
   - GET /api/audit/export/{request_id}?format=json|html
-    - Returns a compliance bundle (JSON or HTML) with section hashes
-    - Export service: [backend/app/services/compliance_export.py](backend/app/services/compliance_export.py)
+    - Returns a compliance bundle (JSON or HTML) with section hashes.
+    - Export implementation: [`ComplianceExportService`](backend/app/services/compliance_export.py)
+- Docs and quick‑start guides
+  - Manage policies: [backend/CreatePolicy.md](backend/CreatePolicy.md)
+  - Deploy & integrate: [backend/Deploy&Integrate.md](backend/Deploy&Integrate.md)
+  - Sample integration: [backend/SampleAPPIntegration.md](backend/SampleAPPIntegration.md)
 
 Traces (correlation helper)
 - Route: [backend/app/api/routes/traces.py](backend/app/api/routes/traces.py)
+- Correlates RAG sessions and ledger trace ids for investigations.
 
 Optional governance and LLM wiring
 - LLM gateway (Ollama/OpenAI): [backend/app/services/llm_gateway.py](backend/app/services/llm_gateway.py)
 - RAG proxy and sessions: [backend/app/services/rag_proxy.py](backend/app/services/rag_proxy.py)
 - Governance ledger: [backend/app/services/governance_ledger.py](backend/app/services/governance_ledger.py)
-- Dependency wiring: [backend/app/core/deps.py](backend/app/core/deps.py)
-
-Security and config
-- Settings: [backend/app/core/config.py](backend/app/core/config.py)
-- Auth helpers: [backend/app/core/auth.py](backend/app/core/auth.py)
-- Engineering guidelines: [constitution.md](constitution.md)
+- Dependency wiring (providers): [backend/app/core/deps.py](backend/app/core/deps.py)
 
 ---
 
