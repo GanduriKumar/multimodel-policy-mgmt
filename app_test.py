@@ -8,7 +8,7 @@ def check_policy(text):
         'tenant_id': 1,
         'policy_id': 1,
         'input_text': text,
-        'evidence_types': []
+        'evidence_types': ["text"]
     }
     
     data = json.dumps(payload).encode('utf-8')
