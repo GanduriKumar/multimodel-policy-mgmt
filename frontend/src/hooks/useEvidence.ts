@@ -83,9 +83,27 @@ export function useEvidence(client: ApiClient = apiDefault) {
 
   const resetError = useCallback(() => setState((s) => ({ ...s, error: null })), []);
 
+  const deleteEvidence = useCallback(
+    async (ids: number[] | number): Promise<number> => {
+      setState((s) => ({ ...s, loading: true, error: null }));
+      try {
+        const body = Array.isArray(ids) ? { evidence_ids: ids } : { evidence_id: ids };
+        const res = await client.apiDelete<{ deleted: number }, typeof body>(`/evidence`, body);
+        if (mountedRef.current) setState((s) => ({ ...s, loading: false }));
+        return res.deleted ?? 0;
+      } catch (err: any) {
+        const e = err instanceof Error ? err : new Error(String(err?.message ?? 'Failed to delete evidence'));
+        if (mountedRef.current) setState({ loading: false, error: e, item: null });
+        throw e;
+      }
+    },
+    [client]
+  );
+
   return {
     ingestEvidence,
     fetchEvidence,
+    deleteEvidence,
     loading: state.loading,
     error: state.error,
     item: state.item,

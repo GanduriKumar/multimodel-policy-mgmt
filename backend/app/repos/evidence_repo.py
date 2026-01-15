@@ -98,13 +98,14 @@ class SqlAlchemyEvidenceRepo:
             content_text=content_text, source=source, description=description, metadata=metadata
         )
 
-        # Deduplicate if possible when a hash exists
+        # Deduplicate if possible when a hash exists (scoped by evidence_type)
         if content_hash:
             existing = (
                 self.session.execute(
                     select(EvidenceItem).where(
                         EvidenceItem.tenant_id == tenant_id,
                         EvidenceItem.content_hash == content_hash,
+                        EvidenceItem.evidence_type == evidence_type.strip(),
                     )
                 )
                 .scalars()
@@ -151,6 +152,7 @@ class SqlAlchemyEvidenceRepo:
                     select(EvidenceItem).where(
                         EvidenceItem.tenant_id == tenant_id,
                         EvidenceItem.content_hash == content_hash,
+                        EvidenceItem.evidence_type == evidence_type.strip(),
                     )
                 )
                 .scalars()
@@ -191,3 +193,22 @@ class SqlAlchemyEvidenceRepo:
             return []
         stmt = select(EvidenceItem).where(EvidenceItem.id.in_([int(i) for i in evidence_ids]))
         return list(self.session.execute(stmt).scalars().all())
+
+    # -------------------------------
+    # Delete
+    # -------------------------------
+
+    def delete_evidence(self, evidence_id: int) -> bool:
+        obj = self.get_evidence(int(evidence_id))
+        if obj is None:
+            return False
+        self.session.delete(obj)
+        self.session.commit()
+        return True
+
+    def delete_evidence_bulk(self, evidence_ids: Sequence[int]) -> int:
+        count = 0
+        for i in list(evidence_ids or []):
+            if self.delete_evidence(int(i)):
+                count += 1
+        return count

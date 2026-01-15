@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Any, Type, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from pydantic import BaseModel
 
 from app.core.deps import get_evidence_repo
 from app.core.contracts import EvidenceRepo
@@ -138,3 +139,43 @@ def get_evidence(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evidence not found")
 
     return _to_model(EvidenceOut, item)
+
+
+class EvidenceDeleteRequest(BaseModel):
+    evidence_ids: list[int] | None = None
+    evidence_id: int | None = None
+
+
+@router.delete("", status_code=status.HTTP_200_OK)
+def delete_evidence(
+    payload: EvidenceDeleteRequest,
+    repo: EvidenceRepo = Depends(get_evidence_repo),
+):
+    """
+    Delete evidence by id or a list of ids. Returns {"deleted": n}.
+
+    Note: This simple route trusts the caller and does not enforce tenant scoping here.
+    """
+    ids: list[int] = []
+    if payload.evidence_ids:
+        ids.extend(int(i) for i in payload.evidence_ids if i)
+    if payload.evidence_id:
+        ids.append(int(payload.evidence_id))
+    # De-dupe ids
+    ids = sorted(set(ids))
+    if not ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No evidence ids provided")
+
+    deleted = 0
+    try:
+        if hasattr(repo, "delete_evidence_bulk"):
+            deleted = getattr(repo, "delete_evidence_bulk")(ids)  # type: ignore[attr-defined]
+        elif hasattr(repo, "delete_evidence"):
+            deleted = sum(1 if getattr(repo, "delete_evidence")(i) else 0 for i in ids)  # type: ignore[attr-defined]
+        else:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Delete not supported")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal error")
+    return {"deleted": int(deleted)}

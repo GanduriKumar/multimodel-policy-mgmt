@@ -19,6 +19,7 @@ from app.db.session import get_db
 from sqlalchemy.orm import Session
 from app.repos.tenant_repo import SqlAlchemyTenantRepo
 from app.repos.policy_repo import SqlAlchemyPolicyRepo
+from app.repos.evidence_repo import SqlAlchemyEvidenceRepo
 
 router = APIRouter(prefix="/api", tags=["protect"])
 
@@ -54,6 +55,35 @@ def protect_endpoint(
                     ev = {str(x).strip() for x in set(payload.evidence_types) if str(x).strip()}
                 except Exception:
                     ev = None
+
+        # Optional: derive evidence types from provided evidence IDs in metadata
+        try:
+            e_repo = SqlAlchemyEvidenceRepo(db)
+            ids: list[int] = []
+            if payload.metadata and isinstance(payload.metadata, dict):
+                raw_ids = payload.metadata.get("evidence_ids")  # can be list or CSV string
+                if isinstance(raw_ids, str):
+                    ids = [int(i) for i in raw_ids.split(',') if i.strip().isdigit()]
+                elif isinstance(raw_ids, (list, tuple, set)):
+                    for i in raw_ids:
+                        try:
+                            ids.append(int(i))
+                        except Exception:
+                            continue
+            if ids:
+                ev = set(ev or set())
+                for eid in ids:
+                    item = None
+                    if hasattr(e_repo, "get_evidence"):
+                        item = getattr(e_repo, "get_evidence")(int(eid))  # type: ignore[attr-defined]
+                    if item is None and hasattr(e_repo, "get_by_id"):
+                        item = getattr(e_repo, "get_by_id")(int(eid))  # type: ignore[attr-defined]
+                    et = getattr(item, "evidence_type", None) if item is not None else None
+                    if isinstance(et, str) and et.strip():
+                        ev.add(et.strip())
+        except Exception:
+            # Do not fail request if evidence lookup fails
+            pass
 
         result = service.protect(
             tenant_id=payload.tenant_id,

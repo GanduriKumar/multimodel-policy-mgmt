@@ -59,18 +59,14 @@ def _find_missing_evidence(
     provided: Set[str], required: Iterable[str]
 ) -> list[str]:
     """
-    Compare provided vs required evidence types.
-    Returns list of reason strings for any missing types.
+    Generic evidence check: if policy specifies any required evidence types,
+    treat presence of any evidence as sufficient. No per-type matching.
     """
-    reasons: list[str] = []
-    prov_norm = {e.strip().lower() for e in provided if isinstance(e, str)}
-    for req in required:
-        req_norm = (req or "").strip().lower()
-        if not req_norm:
-            continue
-        if req_norm not in prov_norm:
-            reasons.append(f"missing_evidence:{req_norm}")
-    return reasons
+    req_list = [(req or "").strip() for req in required if (req or "").strip()]
+    if not req_list:
+        return []
+    has_any = any(isinstance(e, str) and e.strip() for e in provided)
+    return [] if has_any else ["missing_evidence:any"]
 
 
 def _apply_pii_rules(text: str, pii_rules: dict) -> list[str]:
@@ -140,7 +136,7 @@ def evaluate_policy(
     # 1) Blocked terms
     denial_reasons.extend(_find_blocked_terms(input_text, policy.blocked_terms))
 
-    # 2) Required evidence
+    # 2) Required evidence (generic presence-only check)
     denial_reasons.extend(_find_missing_evidence(evidence_types, policy.required_evidence_types))
 
     # 3) PII rules

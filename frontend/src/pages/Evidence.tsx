@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import useEvidence, { type EvidenceCreate, type EvidenceOut } from '../hooks/useEvidence';
 
 const EvidencePage: React.FC = () => {
-  const { ingestEvidence, fetchEvidence, loading, error, item, resetError } = useEvidence();
+  const { ingestEvidence, fetchEvidence, deleteEvidence, loading, error, item, resetError } = useEvidence();
 
   // Ingest form state
   const [tenantId, setTenantId] = useState<number>(1);
@@ -16,6 +16,7 @@ const EvidencePage: React.FC = () => {
 
   // Fetch form state
   const [fetchId, setFetchId] = useState<string>('');
+  const [selectedIdsCsv, setSelectedIdsCsv] = useState<string>('');
 
   const parseJson = useCallback((text: string): Record<string, unknown> | null => {
     const trimmed = (text || '').trim();
@@ -55,6 +56,22 @@ const EvidencePage: React.FC = () => {
       await fetchEvidence(id);
     } catch {
       // handled by hook
+    }
+  };
+
+  const onDelete = async (e: React.FormEvent) => {
+    e.preventDefault();
+    resetError();
+    const ids = selectedIdsCsv
+      .split(',')
+      .map((s) => Number((s || '').trim()))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    if (!ids.length) return;
+    try {
+      const deleted = await deleteEvidence(ids.length === 1 ? ids[0] : ids);
+      alert(`Deleted ${deleted} item(s).`);
+    } catch {
+      // error via hook
     }
   };
 
@@ -139,6 +156,24 @@ const EvidencePage: React.FC = () => {
                 <button className="btn btn-primary" disabled={loading || !fetchId}>Fetch</button>
               </div>
             </form>
+          </div>
+        </div>
+      </section>
+
+      <section className="mb-4">
+        <div className="card">
+          <div className="card-header">Delete Evidence</div>
+          <div className="card-body">
+            <form onSubmit={onDelete} className="row g-3 align-items-end">
+              <div className="col-sm-6">
+                <label htmlFor="delIds" className="form-label">Evidence IDs (CSV)</label>
+                <input id="delIds" className="form-control" value={selectedIdsCsv} onChange={(e) => setSelectedIdsCsv(e.target.value)} placeholder="e.g., 1,2,3" />
+              </div>
+              <div className="col-sm-3">
+                <button className="btn btn-danger" disabled={loading || !selectedIdsCsv.trim()}>Delete</button>
+              </div>
+            </form>
+            <div className="text-muted small mt-2">Note: Deletion is immediate and irreversible.</div>
           </div>
         </div>
       </section>

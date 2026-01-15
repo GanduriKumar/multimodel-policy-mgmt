@@ -11,7 +11,8 @@ type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respo
 export interface ApiClient {
   apiGet<T = unknown>(path: string, params?: Record<string, string | number | boolean | undefined>): Promise<T>;
   apiPost<T = unknown, B = unknown>(path: string, body?: B): Promise<T>;
-}
+  apiDelete<T = unknown, B = unknown>(path: string, body?: B): Promise<T>;
+};
 
 interface ClientOptions {
   baseUrl?: string;
@@ -127,7 +128,23 @@ export function createApiClient(options: ClientOptions = {}): ApiClient {
     return handleResponse<T>(res);
   }
 
-  return { apiGet, apiPost };
+  // DELETE helper
+  async function apiDelete<T = unknown, B = unknown>(path: string, body?: B): Promise<T> {
+    const url = buildUrl(baseUrl, path);
+    const headers: Record<string, string> = {
+      ...defaultHeaders,
+      'Content-Type': 'application/json',
+    };
+    const res = await fetchFn(url, {
+      method: 'DELETE',
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      credentials: 'include',
+    });
+    return handleResponse<T>(res);
+  }
+
+  return { apiGet, apiPost, apiDelete };
 }
 
 // Default client instance for app usage
