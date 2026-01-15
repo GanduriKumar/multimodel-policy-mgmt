@@ -164,12 +164,15 @@ def protect(
     # 4) Compute risk score (evidence presence is a simple boolean)
     evidence_present = bool(ev_types)
     risk_score, risk_reasons = compute_risk(input_text, evidence_present=evidence_present)
-    # 4b) Conservative risk floor: elevate score up to threshold if any risk indicators are present
+    # 4b) Conservative risk floor: elevate score up to threshold only for substantive indicators
+    # Do NOT treat mere "evidence_missing" as a risk that triggers flooring.
     try:
         if getattr(policy_doc, "conservative_mode", False) and risk_reasons:
-            if risk_score < int(policy_doc.risk_threshold):
+            substantive_indicator = any(
+                r.startswith(("prompt_injection:", "pii_like:", "secret_like:")) for r in risk_reasons
+            )
+            if substantive_indicator and risk_score < int(policy_doc.risk_threshold):
                 risk_score = int(policy_doc.risk_threshold)
-                # annotate reason for transparency
                 if "conservative_risk_floor" not in risk_reasons:
                     risk_reasons.append("conservative_risk_floor")
     except Exception:
@@ -185,10 +188,10 @@ def protect(
         allowed = False
         reasons.append(f"risk_above_threshold:{risk_score}>={policy_doc.risk_threshold}")
 
-    # Optional conservative mode: any risk indicator triggers denial
+    # Optional conservative mode: only substantive indicators trigger denial
     try:
         if getattr(policy_doc, "conservative_mode", False):
-            if any(r.startswith(("prompt_injection:", "pii_like:", "secret_like:")) or r == "evidence_missing" for r in risk_reasons):
+            if any(r.startswith(("prompt_injection:", "pii_like:", "secret_like:")) for r in risk_reasons):
                 allowed = False
                 reasons.append("conservative_denial:any_risk_indicator")
     except Exception:

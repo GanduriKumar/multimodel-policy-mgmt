@@ -13,9 +13,11 @@ Welcome! This guide will help you get the **Multimodel Policy Management** syste
 5. [Step 3: Set Up the Frontend (The Dashboard)](#step-3-set-up-the-frontend-the-dashboard)
 6. [Step 4: Create Your First Policy](#step-4-create-your-first-policy)
 7. [Step 5: Test the System](#step-5-test-the-system)
-8. [Step 6: Connect Your Own Application](#step-6-connect-your-own-application)
-9. [Troubleshooting](#troubleshooting)
-10. [Next Steps](#next-steps)
+8. [How to Provide Evidence (Simple)](#how-to-provide-evidence-simple)
+9. [How to View Audits (Simple)](#how-to-view-audits-simple)
+10. [Step 6: Connect Your Own Application](#step-6-connect-your-own-application)
+11. [Troubleshooting](#troubleshooting)
+12. [Next Steps](#next-steps)
 
 ---
 
@@ -299,10 +301,10 @@ Now let's test that the policy actually works!
 1. Go to http://localhost:5173
 2. Click on **"Protect"** in the navigation menu
 3. In the test form:
-   - **Tenant ID**: `1`
-   - **Policy Slug**: `content-safety`
-   - **Input Text**: `This is a forbidden word`
-   - Click **"Check Text"**
+  - **Tenant ID**: `1`
+  - **Policy ID**: `1` (tip: see the Policies list to find the ID)
+  - **Content to evaluate**: `This is a forbidden word`
+  - Click **"Evaluate"**
 
 You should see a result showing **"Not Allowed"** because the word "forbidden" is in your blocked list.
 
@@ -319,7 +321,7 @@ curl -X POST http://localhost:8000/api/protect \
   -H "Content-Type: application/json" \
   -d '{
     "tenant_id": 1,
-    "policy_slug": "content-safety",
+    "policy_id": 1,
     "input_text": "This is a safe sentence",
     "evidence_types": []
   }'
@@ -338,10 +340,89 @@ Or if blocked:
 ```json
 {
   "allowed": false,
-  "reasons": ["Blocked term found: forbidden"],
+  "reasons": ["blocked_term:forbidden"],
   "risk_score": 75
 }
 ```
+
+---
+
+## How to Provide Evidence (Simple)
+
+Why evidence matters:
+- Your policy can require certain evidence types (for example: url, document, text).
+- If those are missing, the request may be denied or marked higher risk (especially in conservative mode).
+
+Two easy ways to provide evidence:
+
+1) Tell the Protect API what kinds of evidence you have
+- In the request body, set evidence_types to a list of tags you can provide.
+- Example: ["url", "document"]. This satisfies policy checks that only look for the presence of these types.
+
+Example (curl):
+```bash
+curl -X POST http://localhost:8000/api/protect \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tenant_id": 1,
+    "policy_id": 1,
+    "input_text": "Write a short story about a library.",
+    "evidence_types": ["text"]
+  }'
+```
+
+2) Store actual evidence records (optional but useful for audits)
+- Use the Evidence API to save a piece of evidence (like a URL or document) with optional metadata.
+- Later, you can point back to these records in your own app logic.
+
+Create evidence (curl):
+```bash
+curl -X POST "http://localhost:8000/api/evidence?tenant_id=1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "evidence_type": "url",
+    "source": "https://example.com/policy",
+    "description": "Official policy page",
+    "content": "Optional raw text used to compute a content hash",
+    "metadata": {"topic": "returns"}
+  }'
+```
+
+Notes:
+- evidence_types in /api/protect is about “what kind” you provided, not linking to a specific record.
+- If your policy requires certain types (like ["url", "document"]) and you send none, the system will add reasons like "missing_evidence:url" and may deny the request.
+- The dashboard Protect page has an “Evidence Types (CSV)” field; enter values like: url,document
+
+---
+
+## How to View Audits (Simple)
+
+The system logs each request and decision so you can review what happened and why.
+
+Easiest: Use the Dashboard
+1) Open http://localhost:5173
+2) Click "Audit"
+3) You’ll see a list of recent requests, their decision (Allowed/Denied), and risk score
+4) Click into a decision to see details and grouped reasons (Policy vs Risk)
+
+APIs (for scripts and exports):
+
+- List recent requests (with snapshot):
+```bash
+curl "http://localhost:8000/api/audit/requests?tenant_id=1&offset=0&limit=50"
+```
+
+- Get full decision detail by decision id (or by request id as fallback in some repos):
+```bash
+curl "http://localhost:8000/api/audit/decisions/123"
+```
+
+Interpreting reasons:
+- Policy reasons: blocked_term:..., missing_evidence:..., pii_denied:...
+- Risk reasons: prompt_injection:..., pii_like:..., secret_like:..., evidence_missing, risk_above_threshold:...
+- If conservative mode is on, you may also see:
+  - conservative_risk_floor (risk lifted to threshold when any indicators present)
+  - conservative_denial:any_risk_indicator
 
 ---
 
@@ -360,7 +441,7 @@ async function checkWithPolicy(userMessage) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       tenant_id: 1,
-      policy_slug: 'content-safety',
+      policy_id: 1,
       input_text: userMessage,
       evidence_types: []
     })
@@ -397,8 +478,8 @@ def check_policy(text):
     """Check if text complies with the policy."""
     url = 'http://localhost:8000/api/protect'
     payload = {
-        'tenant_id': 1,
-        'policy_slug': 'content-safety',
+      'tenant_id': 1,
+      'policy_id': 1,
         'input_text': text,
         'evidence_types': []
     }
@@ -448,7 +529,7 @@ export OPENAI_API_KEY="your-actual-api-key"
 ```bash
 python SampleAppIntegration.py \
   --tenant-id 1 \
-  --policy-slug content-safety \
+  --policy-id 1 \
   --prompt "Write a short story"
 ```
 
@@ -462,7 +543,7 @@ This script:
 ```bash
 python SampleAppIntegration.py \
   --tenant-id 1 \
-  --policy-slug content-safety \
+  --policy-id 1 \
   --prompt "Tell me something forbidden"
 ```
 
