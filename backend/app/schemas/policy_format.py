@@ -48,3 +48,10 @@ class PolicyDoc(BaseModel):
         le=100,
         description="Risk score threshold (0-100) beyond which content is blocked or escalated.",
     )
+
+    # Conservative mode: if True, any risk indicators (prompt injection, PII-like, secret-like, etc.)
+    # will cause denial even when the risk score is below threshold. This opts for "benefit of doubt" -> deny.
+    conservative_mode: bool = Field(
+        default=True,
+        description="When enabled, any risk indicators trigger denial even if risk score is below threshold.",
+    )

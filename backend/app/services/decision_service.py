@@ -164,6 +164,16 @@ def protect(
     # 4) Compute risk score (evidence presence is a simple boolean)
     evidence_present = bool(ev_types)
     risk_score, risk_reasons = compute_risk(input_text, evidence_present=evidence_present)
+    # 4b) Conservative risk floor: elevate score up to threshold if any risk indicators are present
+    try:
+        if getattr(policy_doc, "conservative_mode", False) and risk_reasons:
+            if risk_score < int(policy_doc.risk_threshold):
+                risk_score = int(policy_doc.risk_threshold)
+                # annotate reason for transparency
+                if "conservative_risk_floor" not in risk_reasons:
+                    risk_reasons.append("conservative_risk_floor")
+    except Exception:
+        pass
 
     # 5) Final decision: must satisfy policy and be below threshold
     reasons: list[str] = []
@@ -174,6 +184,15 @@ def protect(
     if risk_score >= int(policy_doc.risk_threshold):
         allowed = False
         reasons.append(f"risk_above_threshold:{risk_score}>={policy_doc.risk_threshold}")
+
+    # Optional conservative mode: any risk indicator triggers denial
+    try:
+        if getattr(policy_doc, "conservative_mode", False):
+            if any(r.startswith(("prompt_injection:", "pii_like:", "secret_like:")) or r == "evidence_missing" for r in risk_reasons):
+                allowed = False
+                reasons.append("conservative_denial:any_risk_indicator")
+    except Exception:
+        pass
 
     # 6) Update request log with resolved policy ids (re-log not ideal; just include in decision)
     decision = audit_repo.log_decision(

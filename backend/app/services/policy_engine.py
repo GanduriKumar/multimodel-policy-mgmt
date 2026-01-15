@@ -39,8 +39,19 @@ def _find_blocked_terms(text: str, blocked_terms: Iterable[str]) -> list[str]:
         term_norm = (term or "").strip()
         if not term_norm:
             continue
-        if term_norm.lower() in t:
+        # Conservative: substring match OR word boundary match both deny
+        low = term_norm.lower()
+        if low in t:
             reasons.append(f"blocked_term:{term_norm}")
+            continue
+        # Word boundary check to catch standalone prohibited words
+        try:
+            import re
+            if re.search(rf"\b{re.escape(low)}\b", t):
+                reasons.append(f"blocked_term:{term_norm}")
+        except Exception:
+            # If regex fails for any reason, fall back to substring logic handled above
+            pass
     return reasons
 
 

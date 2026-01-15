@@ -53,7 +53,8 @@ const Protect: React.FC = () => {
         r.startsWith('pii_like:') ||
         r.startsWith('secret_like:') ||
         r.startsWith('risk_above_threshold') ||
-        r === 'evidence_missing'
+        r === 'evidence_missing' ||
+        r === 'conservative_risk_floor'
       ) {
         risk.push(r);
       } else {
@@ -76,6 +77,8 @@ const Protect: React.FC = () => {
       const [lhs, rhs] = rest.split('>=');
       return `Risk score ${lhs} exceeds threshold ${rhs}`;
     }
+    if (r === 'conservative_risk_floor') return 'Conservative mode: elevated risk to threshold due to indicators present';
+    if (r === 'conservative_denial:any_risk_indicator') return 'Conservative mode: denied due to one or more risk indicators';
     return r;
   };
 
