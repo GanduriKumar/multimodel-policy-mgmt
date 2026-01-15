@@ -9,7 +9,8 @@ const Protect: React.FC = () => {
   const [policyId, setPolicyId] = useState<number>(1);
   const [inputText, setInputText] = useState<string>('');
   const [evidenceTypesCsv, setEvidenceTypesCsv] = useState<string>('');
-  const [evidenceIdsCsv, setEvidenceIdsCsv] = useState<string>(''); // optional UI only
+  const [evidenceIdsCsv, setEvidenceIdsCsv] = useState<string>(''); // hidden by default
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
 
   const [submitted, setSubmitted] = useState<boolean>(false);
 
@@ -92,8 +93,7 @@ const Protect: React.FC = () => {
     <div className="container py-4">
       <h1 className="mb-3">Protect</h1>
       <p className="text-muted">
-        Submit text to be evaluated against the active policy and risk engine. Provide optional evidence types (comma
-        separated) and evidence IDs for reference.
+        Submit text to be evaluated against the active policy and risk engine.
       </p>
 
       <form onSubmit={onSubmit} className="mb-4">
@@ -126,35 +126,47 @@ const Protect: React.FC = () => {
               required
             />
           </div>
-          <div className="col-sm-4">
-            <label htmlFor="evidenceTypes" className="form-label">
-              Evidence Types (CSV)
-            </label>
-            <input
-              id="evidenceTypes"
-              type="text"
-              placeholder="e.g., url,document"
-              className="form-control"
-              value={evidenceTypesCsv}
-              onChange={(e) => setEvidenceTypesCsv(e.target.value)}
-            />
-          </div>
+          {/* Advanced: hidden source inputs (developers only) */}
         </div>
 
         <div className="row g-3 mt-1">
+          {/* Advanced controls: Evidence IDs to pass via metadata */}
           <div className="col-12">
-            <label htmlFor="evidenceIds" className="form-label">
-              Evidence IDs (CSV, optional)
-            </label>
-            <input
-              id="evidenceIds"
-              type="text"
-              placeholder="e.g., 1,2,3"
-              className="form-control"
-              value={evidenceIdsCsv}
-              onChange={(e) => setEvidenceIdsCsv(e.target.value)}
-            />
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-secondary"
+              onClick={() => setShowAdvanced((v) => !v)}
+              aria-expanded={showAdvanced}
+              aria-controls="advanced-section"
+            >
+              {showAdvanced ? 'Hide advanced' : 'Show advanced'}
+            </button>
           </div>
+          {showAdvanced && (
+            <div id="advanced-section" className="col-12 mt-2">
+              <div className="card">
+                <div className="card-header">Advanced</div>
+                <div className="card-body">
+                  <div className="mb-3">
+                    <label htmlFor="evidenceIdsCsv" className="form-label">
+                      Evidence IDs (CSV)
+                    </label>
+                    <input
+                      id="evidenceIdsCsv"
+                      type="text"
+                      className="form-control"
+                      placeholder="e.g., 12,45,78"
+                      value={evidenceIdsCsv}
+                      onChange={(e) => setEvidenceIdsCsv(e.target.value)}
+                    />
+                    <div className="form-text">
+                      These IDs will be sent as metadata.evidence_ids and used to infer evidence types.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mt-3">
@@ -248,13 +260,13 @@ const Protect: React.FC = () => {
               );
             })()}
 
-            <details className="mt-3">
-              <summary className="text-muted">Technical details</summary>
-              <div className="mt-2 small text-muted">
-                <div>Request Log ID: {data.request_log_id ?? '—'}</div>
-                <div>Decision Log ID: {data.decision_log_id ?? '—'}</div>
+            <div className="mt-3 small text-muted">
+              <div className="row g-3">
+                <div className="col-md-4"><strong>Decision Log</strong><div>ID: {data.decision_log_id ?? '—'}</div></div>
+                <div className="col-md-4"><strong>Request Log</strong><div>ID: {data.request_log_id ?? '—'}</div></div>
+                <div className="col-md-4"><strong>Tip</strong><div>See Audit for full details and sources.</div></div>
               </div>
-            </details>
+            </div>
           </div>
         </div>
       )}

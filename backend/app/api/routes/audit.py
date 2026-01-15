@@ -110,6 +110,36 @@ def get_decision_detail(
     reasons = list(getattr(decision, "reasons", []) or [])
     policy_reasons, risk_reasons = _split_reasons(reasons)
 
+    # Extract evidence IDs from the originating request's metadata (if present)
+    evidence_ids: list[int] = []
+    try:
+        req = None
+        if hasattr(repo, "get_request"):
+            req = getattr(repo, "get_request")(getattr(decision, "request_log_id"))  # type: ignore[attr-defined]
+        meta = getattr(req, "metadata_json", None) if req is not None else None
+        raw_ids = None
+        if isinstance(meta, dict):
+            raw_ids = meta.get("evidence_ids")
+        if isinstance(raw_ids, str):
+            # CSV string
+            for part in raw_ids.split(','):
+                part = part.strip()
+                if part.isdigit():
+                    val = int(part)
+                    if val not in evidence_ids:
+                        evidence_ids.append(val)
+        elif isinstance(raw_ids, (list, tuple, set)):
+            for v in raw_ids:
+                try:
+                    val = int(v)
+                    if val not in evidence_ids:
+                        evidence_ids.append(val)
+                except Exception:
+                    continue
+    except Exception:
+        # Best-effort extraction; ignore failures
+        evidence_ids = []
+
     return DecisionDetail(
         decision_id=getattr(decision, "id"),
         request_log_id=getattr(decision, "request_log_id"),
@@ -120,6 +150,6 @@ def get_decision_detail(
         policy_version_id=getattr(decision, "policy_version_id", None),
         policy_reasons=policy_reasons,
         risk_reasons=risk_reasons,
-        evidence_ids=[],  # Not linked in the MVP
+        evidence_ids=evidence_ids,
         created_at=getattr(decision, "created_at"),
     )

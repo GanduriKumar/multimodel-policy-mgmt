@@ -97,6 +97,9 @@ def _apply_pii_rules(text: str, pii_rules: dict) -> list[str]:
         ("deny_on_credit_card", {"credit_card_number"}),
     ]
 
+    # Support DOB-specific denial if configured
+    flag_to_markers.append(("deny_on_dob", {"date_of_birth"}))
+
     for flag, needed in flag_to_markers:
         if pii_rules.get(flag, False) and markers.intersection(needed):
             # Choose a stable reason name from the set (sorted for determinism)
@@ -137,7 +140,8 @@ def evaluate_policy(
     denial_reasons.extend(_find_blocked_terms(input_text, policy.blocked_terms))
 
     # 2) Required evidence (generic presence-only check)
-    denial_reasons.extend(_find_missing_evidence(evidence_types, policy.required_evidence_types))
+    if getattr(policy, "require_any_evidence", False) or policy.required_evidence_types:
+        denial_reasons.extend(_find_missing_evidence(evidence_types, policy.required_evidence_types))
 
     # 3) PII rules
     denial_reasons.extend(_apply_pii_rules(input_text, policy.pii_rules))

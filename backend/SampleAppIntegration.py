@@ -14,11 +14,14 @@ Env vars:
 - OPENAI_MODEL (default: gpt-4o-mini)
 
 Usage examples:
-  # Prompt via argument
-  python backend/SampleAppIntegration.py --tenant-id 1 --policy-id content-safety --prompt "Hello"
+    # Prompt via argument (policy_id is numeric)
+    python backend/SampleAppIntegration.py --tenant-id 1 --policy-id 1 --prompt "Hello"
 
-  # Or read prompt from STDIN
-  echo "Summarize this text..." | python backend/SampleAppIntegration.py --tenant-id 1 --policy-id content-safety
+    # Or read prompt from STDIN
+    echo "Summarize this text..." | python backend/SampleAppIntegration.py --tenant-id 1 --policy-id 1
+
+    # Optionally pass source IDs captured elsewhere (will be used to derive evidence types automatically)
+    python backend/SampleAppIntegration.py --tenant-id 1 --policy-id 1 --prompt "Hello" --evidence-ids 12,34
 
 Notes:
 - Protect endpoint: see backend route [app.api.routes.protect](backend/app/api/routes/protect.py)
@@ -33,7 +36,7 @@ import os
 import sys
 import urllib.error
 import urllib.request
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, Optional, Set, List
 
 
 def _json_post(url: str, payload: Dict[str, Any], headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
@@ -59,9 +62,10 @@ def protect(
     *,
     backend_url: str,
     tenant_id: int,
-    policy_id: str,
+    policy_id: int,
     text: str,
     evidence_types: Optional[Set[str]] = None,
+    metadata: Optional[Dict[str, Any]] = None,
     api_key: Optional[str] = None,
     api_key_header: str = "x-api-key",
 ) -> Dict[str, Any]:
@@ -72,12 +76,16 @@ def protect(
     headers: Dict[str, str] = {}
     if api_key:
         headers[api_key_header] = api_key
-    payload = {
+    payload: Dict[str, Any] = {
         "tenant_id": tenant_id,
         "policy_id": policy_id,
         "input_text": text,
-        "evidence_types": sorted(list(evidence_types or set())),
     }
+    # Only include optional fields if provided
+    if evidence_types:
+        payload["evidence_types"] = sorted(list(evidence_types))
+    if metadata:
+        payload["metadata"] = metadata
     return _json_post(url, payload, headers)
 
 
@@ -121,9 +129,10 @@ def call_openai_chat(*, api_key: str, model: str, prompt: str) -> str:
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Bidirectional policy-guarded GenAI app (Python).")
     p.add_argument("--tenant-id", type=int, required=True, help="Tenant identifier used by backend policies.")
-    p.add_argument("--policy-id", type=str, required=True, help="Policy id to enforce.")
+    p.add_argument("--policy-id", type=int, required=True, help="Numeric policy id to enforce.")
     p.add_argument("--prompt", type=str, default=None, help="Prompt text; if omitted, read from STDIN.")
     p.add_argument("--evidence-types", type=str, default="", help="Comma-separated evidence types (e.g., url,document).")
+    p.add_argument("--evidence-ids", type=str, default="", help="Comma-separated evidence IDs to include in metadata.")
     p.add_argument("--backend-url", type=str, default=os.getenv("BACKEND_URL", "http://localhost:8000"))
     p.add_argument("--backend-api-key", type=str, default=os.getenv("BACKEND_API_KEY"))
     p.add_argument("--backend-api-key-header", type=str, default=os.getenv("BACKEND_API_KEY_HEADER", "x-api-key"))
@@ -151,6 +160,12 @@ def main() -> int:
         return 2
 
     ev_types = {s.strip() for s in (args.evidence_types or "").split(",") if s.strip()}
+    ev_ids: List[int] = []
+    for part in (args.evidence_ids or "").split(","):
+        part = part.strip()
+        if part.isdigit():
+            ev_ids.append(int(part))
+    meta: Optional[Dict[str, Any]] = {"evidence_ids": ev_ids} if ev_ids else None
 
     # Pre-check
     try:
@@ -160,6 +175,7 @@ def main() -> int:
             policy_id=args.policy_id,
             text=prompt,
             evidence_types=ev_types,
+            metadata=meta,
             api_key=args.backend_api_key,
             api_key_header=args.backend_api_key_header,
         )
@@ -192,6 +208,7 @@ def main() -> int:
             policy_id=args.policy_id,
             text=draft,
             evidence_types=ev_types,
+            metadata=meta,
             api_key=args.backend_api_key,
             api_key_header=args.backend_api_key_header,
         )

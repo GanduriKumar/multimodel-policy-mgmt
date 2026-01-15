@@ -5,6 +5,6 @@ __all__ = [
     "evidence",
     "audit",
     "protect",
-    "traces",
-    "protect_generate",
+    "maintenance",  # Added maintenance to the exports
 ]
+from . import maintenance  # noqa: F401

@@ -4,8 +4,8 @@ import NavBar from './components/NavBar';
 import Home from './pages/Home';
 import Protect from './pages/Protect';
 import Policies from './pages/Policies';
-import Evidence from './pages/Evidence';
 import Audit from './pages/Audit';
+import Admin from './pages/Admin';
 
 const NotFound: React.FC = () => (
   <div className="alert alert-warning" role="alert">
@@ -23,8 +23,9 @@ const App: React.FC = () => {
           <Route path="/" element={<Home />} />
           <Route path="/protect" element={<Protect />} />
           <Route path="/policies" element={<Policies />} />
-          <Route path="/evidence" element={<Evidence />} />
+          {false && <Route path="/evidence" element={<div />} />}
           <Route path="/audit" element={<Audit />} />
+          <Route path="/admin" element={<Admin />} />
           <Route path="/home" element={<Navigate to="/" replace />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

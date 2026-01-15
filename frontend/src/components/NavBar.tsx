@@ -6,7 +6,7 @@ const NavBar: React.FC = () => {
     <nav className="navbar navbar-expand-lg navbar-light bg-light border-bottom">
       <div className="container">
         <NavLink className="navbar-brand fw-semibold text-primary" to="/">
-          SatyaSethu
+          Policy Guard
         </NavLink>
 
         <button
@@ -57,16 +57,7 @@ const NavBar: React.FC = () => {
               </NavLink>
             </li>
 
-            <li className="nav-item">
-              <NavLink
-                to="/evidence"
-                className={({ isActive }) =>
-                  `nav-link text-primary${isActive ? ' active fw-semibold' : ''}`
-                }
-              >
-                Evidence
-              </NavLink>
-            </li>
+            {/* Sources page removed from navigation (auto-captured in app flows) */}
 
             <li className="nav-item">
               <NavLink
@@ -78,10 +69,20 @@ const NavBar: React.FC = () => {
                 Audit
               </NavLink>
             </li>
+            <li className="nav-item">
+              <NavLink
+                to="/admin"
+                className={({ isActive }) =>
+                  `nav-link text-primary${isActive ? ' active fw-semibold' : ''}`
+                }
+              >
+                Admin
+              </NavLink>
+            </li>
           </ul>
 
           <span className="navbar-text text-muted small">
-            Policy Management UI
+            Safer AI, simpler controls
           </span>
         </div>
       </div>

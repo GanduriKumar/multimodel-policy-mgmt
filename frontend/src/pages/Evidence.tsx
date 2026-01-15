@@ -88,13 +88,13 @@ const EvidencePage: React.FC = () => {
   return (
     <div className="container py-4">
       <div className="d-flex align-items-center justify-content-between mb-3">
-        <h1 className="mb-0">Evidence</h1>
+        <h1 className="mb-0">Sources</h1>
         <a className="btn btn-outline-secondary" href="/">Home</a>
       </div>
 
       <section className="mb-4">
         <div className="card">
-          <div className="card-header">Ingest Evidence</div>
+          <div className="card-header">Add a Source</div>
           <div className="card-body">
             <form onSubmit={onIngest} className="row g-3">
               <div className="col-sm-2">
@@ -102,11 +102,11 @@ const EvidencePage: React.FC = () => {
                 <input id="tenantId" type="number" min={1} className="form-control" value={tenantId} onChange={(e) => setTenantId(Number(e.target.value))} required />
               </div>
               <div className="col-sm-3">
-                <label htmlFor="etype" className="form-label">Evidence Type</label>
+                <label htmlFor="etype" className="form-label">Source Type</label>
                 <input id="etype" className="form-control" value={evidenceType} onChange={(e) => setEvidenceType(e.target.value)} required />
               </div>
               <div className="col-sm-7">
-                <label htmlFor="source" className="form-label">Source (URL or ref)</label>
+                <label htmlFor="source" className="form-label">Source (URL or reference)</label>
                 <input id="source" className="form-control" value={source} onChange={(e) => setSource(e.target.value)} placeholder="https://example.com/resource" />
               </div>
 
@@ -135,7 +135,7 @@ const EvidencePage: React.FC = () => {
 
               <div className="col-12">
                 <button className="btn btn-success" disabled={loading}>
-                  {loading ? 'Submitting…' : 'Ingest Evidence'}
+                  {loading ? 'Submitting…' : 'Save Source'}
                 </button>
               </div>
             </form>
@@ -145,11 +145,11 @@ const EvidencePage: React.FC = () => {
 
       <section className="mb-4">
         <div className="card">
-          <div className="card-header">Fetch Evidence</div>
+          <div className="card-header">Fetch Source</div>
           <div className="card-body">
             <form onSubmit={onFetch} className="row g-3 align-items-end">
               <div className="col-sm-3">
-                <label htmlFor="fetchId" className="form-label">Evidence ID</label>
+                <label htmlFor="fetchId" className="form-label">Source ID</label>
                 <input id="fetchId" className="form-control" value={fetchId} onChange={(e) => setFetchId(e.target.value)} placeholder="e.g., 1" />
               </div>
               <div className="col-sm-3">
@@ -162,11 +162,11 @@ const EvidencePage: React.FC = () => {
 
       <section className="mb-4">
         <div className="card">
-          <div className="card-header">Delete Evidence</div>
+          <div className="card-header">Delete Sources</div>
           <div className="card-body">
             <form onSubmit={onDelete} className="row g-3 align-items-end">
               <div className="col-sm-6">
-                <label htmlFor="delIds" className="form-label">Evidence IDs (CSV)</label>
+                <label htmlFor="delIds" className="form-label">Source IDs (CSV)</label>
                 <input id="delIds" className="form-control" value={selectedIdsCsv} onChange={(e) => setSelectedIdsCsv(e.target.value)} placeholder="e.g., 1,2,3" />
               </div>
               <div className="col-sm-3">
@@ -187,7 +187,7 @@ const EvidencePage: React.FC = () => {
       {item && (
         <section>
           <div className="card">
-            <div className="card-header">Evidence Details</div>
+            <div className="card-header">Source Details</div>
             <div className="card-body">
               <div className="row mb-2">
                 <div className="col-sm-3"><strong>ID:</strong> {item.id}</div>

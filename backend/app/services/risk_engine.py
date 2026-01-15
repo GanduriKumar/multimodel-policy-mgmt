@@ -54,6 +54,9 @@ def compute_risk(input_text: str, evidence_present: bool) -> tuple[int, list[str
     reasons.update(f"prompt_injection:{m}" for m in inj_markers)
     reasons.update(f"secret_like:{m}" for m in sec_markers)
     reasons.update(f"pii_like:{m}" for m in pii_markers)
+    # Promote DOB to a stronger PII-like marker if present
+    if "date_of_birth" in pii_markers:
+        reasons.add("pii_like:date_of_birth")
 
     # Scoring based on matches
     score = 0

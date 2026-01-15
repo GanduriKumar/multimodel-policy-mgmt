@@ -1,8 +1,13 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import useAudit, { type AuditListRow, type DecisionDetail } from '../hooks/useAudit';
+import useEvidence from '../hooks/useEvidence';
+import api from '../api/client';
 
 const AuditPage: React.FC = () => {
   const { list, total, loading, error, detail, listRequests, getDecisionDetail, resetError } = useAudit();
+  const { fetchEvidence, item: evidenceItem, loading: evidenceLoading, error: evidenceError, resetError: resetEvidenceError } = useEvidence();
+  const [policyInfo, setPolicyInfo] = useState<{ id: number; name: string; slug: string } | null>(null);
+  const [policyVersionInfo, setPolicyVersionInfo] = useState<{ id: number; version: number } | null>(null);
 
   // List controls
   const [tenantId, setTenantId] = useState<number>(1);
@@ -25,6 +30,7 @@ const AuditPage: React.FC = () => {
   const onFetchDetail = async (e: React.FormEvent) => {
     e.preventDefault();
     resetError();
+    resetEvidenceError();
     const idNum = Number(detailId);
     if (!idNum || idNum < 1) return;
     try {
@@ -33,6 +39,29 @@ const AuditPage: React.FC = () => {
       // handled by error state
     }
   };
+
+  // When an evidence item is loaded, fetch its policy and version details for friendlier display
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPolicyContext() {
+      setPolicyInfo(null);
+      setPolicyVersionInfo(null);
+      if (!evidenceItem || !evidenceItem.policy_id) return;
+      try {
+        const pol = await api.apiGet<{ id: number; name: string; slug: string }>(`/policies/${evidenceItem.policy_id}`);
+        if (!cancelled && pol) setPolicyInfo({ id: pol.id, name: pol.name, slug: pol.slug });
+      } catch {}
+      try {
+        if (!evidenceItem?.policy_id) return;
+        const list = await api.apiGet<{ items: Array<{ id: number; version: number }> }>(`/policies/${evidenceItem.policy_id}/versions`);
+        if (cancelled || !list?.items?.length) return;
+        const match = list.items.find(v => v.id === evidenceItem.policy_version_id);
+        if (!cancelled && match) setPolicyVersionInfo({ id: match.id, version: match.version });
+      } catch {}
+    }
+    loadPolicyContext();
+    return () => { cancelled = true; };
+  }, [evidenceItem]);
 
   const fmt = (iso?: string) => {
     if (!iso) return '—';
@@ -200,6 +229,91 @@ const AuditPage: React.FC = () => {
                     </ul>
                   ) : (
                     <p className="text-muted">None</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="row mt-3">
+                <div className="col-12">
+                  <h6>Sources (Evidence)</h6>
+                  {detail.evidence_ids && detail.evidence_ids.length > 0 ? (
+                    <div className="table-responsive">
+                      <table className="table table-sm align-middle">
+                        <thead>
+                          <tr>
+                            <th>ID</th>
+                            <th>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {detail.evidence_ids.map((id) => (
+                            <tr key={id}>
+                              <td>{id}</td>
+                              <td className="d-flex gap-2">
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline-primary"
+                                  onClick={() => fetchEvidence(id)}
+                                  disabled={evidenceLoading}
+                                >
+                                  {evidenceLoading ? 'Loading…' : 'View'}
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-muted">No sources referenced for this decision.</p>
+                  )}
+
+                  {evidenceError && (
+                    <div className="alert alert-warning mt-2" role="alert">
+                      Failed to fetch evidence: {evidenceError.message}
+                    </div>
+                  )}
+
+                  {evidenceItem && (
+                    <div className="card mt-2">
+                      <div className="card-header">Evidence Detail (ID {evidenceItem.id})</div>
+                      <div className="card-body small">
+                        <div className="row g-3">
+                          <div className="col-md-6">
+                            <div className="mb-2"><strong>Type</strong><div>{evidenceItem.evidence_type}</div></div>
+                            <div className="mb-2"><strong>Captured</strong><div>{new Date(evidenceItem.created_at).toLocaleString()}</div></div>
+                            <div className="mb-2"><strong>Description</strong><div>{evidenceItem.description || '—'}</div></div>
+                          </div>
+                          <div className="col-md-6">
+                            <div className="mb-2">
+                              <strong>Policy Context</strong>
+                              <div>
+                                {policyInfo ? (
+                                  <span title={`Policy ID ${policyInfo.id}`}>Policy: {policyInfo.name} ({policyInfo.slug})</span>
+                                ) : (
+                                  <span>Policy: {evidenceItem.policy_id ?? '—'}</span>
+                                )}
+                              </div>
+                              <div>
+                                {policyVersionInfo ? (
+                                  <span title={`Version ID ${policyVersionInfo.id}`}>Version: {policyVersionInfo.version}</span>
+                                ) : (
+                                  <span>Version: {evidenceItem.policy_version_id ?? '—'}</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="mb-2"><strong>Source</strong><div>{evidenceItem.source || '—'}</div></div>
+                            <div className="mb-2"><strong>Content Hash</strong><div><code>{evidenceItem.content_hash || '—'}</code></div></div>
+                          </div>
+                        </div>
+                        {evidenceItem.metadata && (
+                          <details className="mt-2">
+                            <summary className="text-muted">Metadata</summary>
+                            <pre className="mt-2 bg-light p-2 border rounded"><code>{JSON.stringify(evidenceItem.metadata, null, 2)}</code></pre>
+                          </details>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

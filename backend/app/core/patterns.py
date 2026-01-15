@@ -155,6 +155,28 @@ def detect_pii_like(text: str) -> list[str]:
 
     reasons = set(_search_patterns(text, _PII_PATTERNS))
 
+    # Date of Birth (DOB) detection: look for DOB keywords near a date string
+    try:
+        month_names = r"Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?"
+        day = r"(?:[0-3]?\d)(?:st|nd|rd|th)?"
+        year = r"(?:\d{4}|\d{2})"
+        sep = r"[-/\\.,\s]"
+        # Date formats: 17 Mar 1969 | Mar 17, 1969 | 17/03/1969 | 03-17-1969
+        d1 = rf"{day}\s+(?:{month_names})\s+{year}"
+        d2 = rf"(?:{month_names})\s+{day}(?:,?\s+{year})?"
+        d3 = rf"\d{{1,2}}{sep}\d{{1,2}}{sep}{year}"
+        date_pattern = rf"(?:{d1}|{d2}|{d3})"
+
+        dob_keywords = r"(?:d\.?o\.?b\.?|dob|date\s+of\s+birth|birth\s*date|birthdate|birthday|born\s+on)"
+        # Allow up to ~40 arbitrary characters (including words like 'is') between keyword and date
+        dob_regex = re.compile(rf"\b{dob_keywords}\b[\s\S]{{0,40}}{date_pattern}", re.IGNORECASE)
+        dob_regex_alt = re.compile(rf"{date_pattern}[\s\S]{{0,40}}\b{dob_keywords}\b", re.IGNORECASE)
+
+        if dob_regex.search(text) or dob_regex_alt.search(text):
+            reasons.add("date_of_birth")
+    except Exception:
+        pass
+
     # Credit card detection with Luhn validation
     for match in _CC_CANDIDATE.findall(text):
         digits_only = re.sub(r"[ -]", "", match)

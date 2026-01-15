@@ -29,10 +29,15 @@ class PolicyDoc(BaseModel):
         description="Whitelisted sources (domains, identifiers, etc.).",
     )
 
-    # Evidence categories that must be provided for claims (e.g., 'url', 'document', 'dataset')
+    # Evidence configuration
+    # required_evidence_types retained for backward compatibility but is presence-only in engine
     required_evidence_types: list[str] = Field(
         ...,
-        description="Evidence types required to support claims.",
+        description="Deprecated granular types; engine treats any source as satisfying evidence.",
+    )
+    require_any_evidence: bool = Field(
+        default=False,
+        description="If true, require at least one source/evidence to be provided.",
     )
 
     # Configuration dict for PII handling (e.g., {'mask_emails': True, 'allow_phone': False})

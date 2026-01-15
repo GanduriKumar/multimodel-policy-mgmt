@@ -44,6 +44,16 @@ def protect_endpoint(
         pol = getattr(p_repo, "get_policy_by_id")(int(payload.policy_id))
         if pol is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Policy not found")
+        # Resolve active policy version (for linking evidence context when auto-capturing)
+        pv = None
+        pv_id = None
+        try:
+            if hasattr(p_repo, "get_active_version"):
+                pv = getattr(p_repo, "get_active_version")(int(payload.policy_id))  # type: ignore[attr-defined]
+                pv_id = getattr(pv, "id", None)
+        except Exception:
+            pv = None
+            pv_id = None
 
         # Normalize evidence_types to a clean set[str], accepting string CSV or list
         ev = None
@@ -60,6 +70,7 @@ def protect_endpoint(
         try:
             e_repo = SqlAlchemyEvidenceRepo(db)
             ids: list[int] = []
+            valid_ids: list[int] = []
             if payload.metadata and isinstance(payload.metadata, dict):
                 raw_ids = payload.metadata.get("evidence_ids")  # can be list or CSV string
                 if isinstance(raw_ids, str):
@@ -78,9 +89,36 @@ def protect_endpoint(
                         item = getattr(e_repo, "get_evidence")(int(eid))  # type: ignore[attr-defined]
                     if item is None and hasattr(e_repo, "get_by_id"):
                         item = getattr(e_repo, "get_by_id")(int(eid))  # type: ignore[attr-defined]
-                    et = getattr(item, "evidence_type", None) if item is not None else None
-                    if isinstance(et, str) and et.strip():
-                        ev.add(et.strip())
+                    if item is not None:
+                        et = getattr(item, "evidence_type", None)
+                        if isinstance(et, str) and et.strip():
+                            ev.add(et.strip())
+                        valid_ids.append(int(eid))
+            # If no valid IDs were provided, auto-capture the input as an evidence item for audit
+            if not valid_ids:
+                try:
+                    created = e_repo.create_evidence(
+                        tenant_id=payload.tenant_id,
+                        evidence_type="document",
+                        content_text=payload.input_text,
+                        description="Captured request content",
+                        policy_id=int(payload.policy_id),
+                        policy_version_id=(int(pv_id) if pv_id else None),
+                    )
+                    valid_ids = [int(getattr(created, "id"))]
+                    ev = set(ev or set())
+                    ev.add("document")
+                except Exception:
+                    # Do not fail main flow if auto-capture fails
+                    pass
+
+            # Sanitize metadata to include only valid evidence ids for audit
+            try:
+                meta = dict(payload.metadata or {})
+                meta["evidence_ids"] = valid_ids
+                payload.metadata = meta  # type: ignore[attr-defined]
+            except Exception:
+                pass
         except Exception:
             # Do not fail request if evidence lookup fails
             pass

@@ -60,6 +60,7 @@ def _include_known_subrouters(parent: APIRouter) -> List[str]:
         "app.api.routes.policies",
         "app.api.routes.traces",
         "app.api.routes.protect_generate",
+        "app.api.routes.maintenance",  # admin/reset-all
     ]
     included: List[str] = []
     for mod in candidates:
