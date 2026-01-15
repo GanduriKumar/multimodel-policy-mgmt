@@ -1,5 +1,24 @@
 :root {
   color-scheme: light;
+  /* Google brand-inspired palette */
+  --g-blue:    #1a73e8; /* Google Blue 600 */
+  --g-red:     #d93025; /* Google Red 600 */
+  --g-yellow:  #f9ab00; /* Google Yellow 600 */
+  --g-green:   #188038; /* Google Green 700 */
+  --g-surface: #f8f9fa; /* Surface */
+  --g-text:    #202124; /* Text */
+
+  /* Bootstrap 5 color variable overrides for global theming */
+  --bs-primary: var(--g-blue);
+  --bs-success: var(--g-green);
+  --bs-danger:  var(--g-red);
+  --bs-warning: var(--g-yellow);
+  --bs-secondary: #5f6368; /* Material grey */
+  --bs-info: #185abc;      /* Dark Google blue for info */
+  --bs-link-color: var(--g-blue);
+  --bs-link-hover-color: #185abc;
+  --bs-body-bg: var(--g-surface);
+  --bs-body-color: var(--g-text);
 }
 html, body, #root {
   height: 100%;
@@ -7,6 +26,91 @@ html, body, #root {
 body {
   margin: 0;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  background: #fff;
-  color: #212529;
+  background: var(--g-surface);
+  color: var(--g-text);
+}
+
+/* Navbar theming */
+.navbar-light.bg-light {
+  background-color: #fff !important;
+  border-bottom: 2px solid rgba(30,34,170,0.1) !important;
+}
+.navbar .navbar-brand {
+  color: var(--g-blue) !important;
+}
+.navbar .nav-link { color: var(--g-blue) !important; }
+.navbar .nav-link.active { color: var(--g-blue) !important; }
+.navbar .nav-link:hover { color: #185abc !important; }
+/* Ensure Bootstrap's navbar-light defaults are overridden */
+.navbar-light .navbar-nav .nav-link { color: var(--g-blue) !important; }
+.navbar-light .navbar-nav .nav-link:hover, .navbar-light .navbar-nav .nav-link:focus { color: #185abc !important; }
+.navbar-light .navbar-toggler { border-color: rgba(26,115,232,0.25) !important; }
+.navbar-light .navbar-toggler-icon {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 30 30' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke='rgba(26,115,232,0.9)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E") !important;
+}
+
+/* Buttons */
+.btn-primary {
+  background-color: var(--g-blue) !important;
+  border-color: var(--g-blue) !important;
+}
+.btn-outline-secondary {
+  color: var(--g-blue);
+  border-color: var(--g-blue);
+}
+.btn-outline-secondary:hover {
+  background-color: var(--g-blue);
+  color: #fff;
+}
+.btn-success {
+  background-color: var(--g-green) !important;
+  border-color: var(--g-green) !important;
+}
+.btn-danger, .btn-outline-danger:hover {
+  background-color: var(--g-red) !important;
+  border-color: var(--g-red) !important;
+}
+.btn-warning {
+  background-color: var(--g-yellow) !important;
+  border-color: var(--g-yellow) !important;
+  color: #202124 !important;
+}
+.btn-secondary {
+  background-color: var(--bs-secondary) !important;
+  border-color: var(--bs-secondary) !important;
+}
+.btn-info {
+  background-color: var(--bs-info) !important;
+  border-color: var(--bs-info) !important;
+}
+
+/* Background utility overrides to align with Google colors */
+.bg-success { background-color: var(--g-green) !important; }
+.bg-danger { background-color: var(--g-red) !important; }
+.bg-primary { background-color: var(--g-blue) !important; }
+.text-primary { color: var(--g-blue) !important; }
+
+/* Cards and headers */
+.card-header {
+  background-color: #fff;
+  border-bottom: 2px solid rgba(26,115,232,0.15);
+}
+
+/* Badges */
+.badge.bg-success {
+  background-color: var(--g-green) !important;
+}
+.badge.bg-secondary {
+  background-color: #6c757d !important;
+}
+.badge.bg-danger { background-color: var(--g-red) !important; }
+.badge.bg-warning { background-color: var(--g-yellow) !important; color: #202124 !important; }
+.badge.bg-primary { background-color: var(--g-blue) !important; }
+
+/* Links */
+a {
+  color: var(--g-blue);
+}
+a:hover {
+  color: #185abc;
 }

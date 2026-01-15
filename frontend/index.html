@@ -11,6 +11,20 @@
       integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
       crossorigin="anonymous"
     />
+    <!-- Inline brand overrides to ensure colors apply even before app CSS loads -->
+    <style>
+      :root{
+        --g-blue:#1a73e8;--g-red:#d93025;--g-yellow:#f9ab00;--g-green:#188038;--g-surface:#f8f9fa;--g-text:#202124;
+        --bs-primary: var(--g-blue); --bs-success: var(--g-green); --bs-danger: var(--g-red); --bs-warning: var(--g-yellow);
+        --bs-link-color: var(--g-blue); --bs-link-hover-color:#185abc; --bs-body-bg: var(--g-surface); --bs-body-color: var(--g-text);
+      }
+      .bg-success{background-color:var(--g-green)!important}.bg-danger{background-color:var(--g-red)!important}.bg-primary{background-color:var(--g-blue)!important}
+      .btn-primary{background-color:var(--g-blue)!important;border-color:var(--g-blue)!important}
+      .btn-success{background-color:var(--g-green)!important;border-color:var(--g-green)!important}
+      .btn-danger{background-color:var(--g-red)!important;border-color:var(--g-red)!important}
+      .navbar .navbar-brand,.navbar .nav-link.active,.navbar .nav-link:hover{color:var(--g-blue)!important}
+      a{color:var(--g-blue)} a:hover{color:#185abc}
+    </style>
   </head>
   <body>
     <div id="root"></div>

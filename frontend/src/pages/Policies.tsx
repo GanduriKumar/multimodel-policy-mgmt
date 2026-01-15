@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import usePolicies, { type PolicyOut, type PolicyVersionOut, type CreatePolicyPayload } from '../hooks/usePolicies';
 
 const Policies: React.FC = () => {
-  const { items, total, loading, error, listPolicies, createPolicy, addVersion, activateVersion, getActiveVersion, deletePolicy, resetError } = usePolicies();
+  const { items, total, loading, error, listPolicies, createPolicy, addVersion, activateVersion, getActiveVersion, listVersions, deletePolicy, resetError } = usePolicies();
 
   // Tenant selector
   const [tenantId, setTenantId] = useState<number>(1);
@@ -24,11 +24,44 @@ const Policies: React.FC = () => {
     lastVersion?: PolicyVersionOut | null;
   };
   const [rowState, setRowState] = useState<Record<number, RowState>>({});
+  const [selectedJson, setSelectedJson] = useState<{
+    policyId: number;
+    jsonText: string;
+    activeVersion: number | null;
+    busy: boolean;
+    error: string | null;
+    lastSaved?: number | null;
+  } | null>(null);
+
+  // Compare versions panel state
+  const [comparePanel, setComparePanel] = useState<{
+    open: boolean;
+    policyId: number | null;
+    versions: PolicyVersionOut[];
+    leftVersion?: number;
+    rightVersion?: number;
+    diff?: string;
+    busy: boolean;
+    error: string | null;
+  }>({ open: false, policyId: null, versions: [], busy: false, error: null });
 
   const getRow = useCallback(
     (policyId: number): RowState =>
       rowState[policyId] ?? {
-        docText: '{"risk_threshold": 80}',
+        docText: JSON.stringify({
+          blocked_terms: [],
+          allowed_sources: [],
+          required_evidence_types: [],
+          pii_rules: {
+            deny_when_any_pii: false,
+            deny_on_email: false,
+            deny_on_phone: false,
+            deny_on_ssn: false,
+            deny_on_ipv4: false,
+            deny_on_credit_card: false,
+          },
+          risk_threshold: 50,
+        }, null, 2),
         isActive: true,
         activateInput: '',
         busy: false,
@@ -41,6 +74,98 @@ const Policies: React.FC = () => {
   const setRow = useCallback((policyId: number, partial: Partial<RowState>) => {
     setRowState((prev) => ({ ...prev, [policyId]: { ...getRow(policyId), ...partial } }));
   }, [getRow]);
+
+  const loadSelectedJson = useCallback(async (policyId: number) => {
+    try {
+      const cur = await getActiveVersion(policyId);
+      const doc = cur?.document ?? {
+        blocked_terms: [],
+        allowed_sources: [],
+        required_evidence_types: [],
+        pii_rules: {
+          deny_when_any_pii: false,
+          deny_on_email: false,
+          deny_on_phone: false,
+          deny_on_ssn: false,
+          deny_on_ipv4: false,
+          deny_on_credit_card: false,
+        },
+        risk_threshold: 50,
+      };
+      const text = JSON.stringify(doc, null, 2);
+      setSelectedJson({ policyId, jsonText: text, activeVersion: cur?.version ?? null, busy: false, error: null, lastSaved: null });
+      // Reflect the freshly fetched active version in the table immediately
+      setRow(policyId, { lastVersion: cur ?? null });
+    } catch (e: any) {
+      const text = JSON.stringify({
+        blocked_terms: [],
+        allowed_sources: [],
+        required_evidence_types: [],
+        pii_rules: {
+          deny_when_any_pii: false,
+          deny_on_email: false,
+          deny_on_phone: false,
+          deny_on_ssn: false,
+          deny_on_ipv4: false,
+          deny_on_credit_card: false,
+        },
+        risk_threshold: 50,
+      }, null, 2);
+      setSelectedJson({ policyId, jsonText: text, activeVersion: null, busy: false, error: e?.message ?? 'Failed to load policy JSON', lastSaved: null });
+    }
+  }, [getActiveVersion, setRow]);
+
+  const openCompare = useCallback(async (policyId: number) => {
+    setComparePanel({ open: true, policyId, versions: [], leftVersion: undefined, rightVersion: undefined, diff: undefined, busy: true, error: null });
+    try {
+      const res = await listVersions(policyId, { limit: 200 });
+      setComparePanel((s) => ({ ...(s || { open: true, policyId }), open: true, policyId, versions: res.items || [], busy: false, error: null }));
+    } catch (e: any) {
+      setComparePanel((s) => ({ ...(s || { open: true, policyId }), open: true, policyId, versions: [], busy: false, error: e?.message ?? 'Failed to load versions' }));
+    }
+  }, [listVersions]);
+
+  const computeDiff = useCallback((a: unknown, b: unknown): string => {
+    try {
+      const aStr = JSON.stringify(a, null, 2);
+      const bStr = JSON.stringify(b, null, 2);
+      // Simple line-by-line diff
+      const aLines = aStr.split('\n');
+      const bLines = bStr.split('\n');
+      const max = Math.max(aLines.length, bLines.length);
+      const out: string[] = [];
+      for (let i = 0; i < max; i++) {
+        const l = aLines[i] ?? '';
+        const r = bLines[i] ?? '';
+        if (l === r) {
+          out.push('  ' + l);
+        } else {
+          if (l) out.push('- ' + l);
+          if (r) out.push('+ ' + r);
+        }
+      }
+      return out.join('\n');
+    } catch (e: any) {
+      return 'Failed to diff: ' + (e?.message ?? 'error');
+    }
+  }, []);
+
+  const onSelectCompareSide = useCallback((side: 'left'|'right', versionNum: number | undefined) => {
+    setComparePanel((s) => {
+      if (!s) return s as any;
+      const leftVersion = side === 'left' ? versionNum : s.leftVersion;
+      const rightVersion = side === 'right' ? versionNum : s.rightVersion;
+      let diff: string | undefined = s.diff;
+      if (leftVersion && rightVersion && leftVersion !== rightVersion) {
+        const va = s.versions.find(v => v.version === leftVersion);
+        const vb = s.versions.find(v => v.version === rightVersion);
+        if (va && vb) diff = computeDiff(va.document, vb.document);
+      } else {
+        diff = undefined;
+      }
+      return { ...s, leftVersion, rightVersion, diff };
+    });
+  }, [computeDiff]);
 
   // Auto-load policies when page mounts or tenant changes
   useEffect(() => {
@@ -215,6 +340,121 @@ const Policies: React.FC = () => {
 
       {/* Create policy */}
       <section className="mb-4">
+        {comparePanel.open && (
+          <div className="card mb-3">
+            <div className="card-header d-flex justify-content-between align-items-center">
+              <span>Compare Policy Versions {comparePanel.policyId ? <small className="text-muted">(Policy ID: {comparePanel.policyId})</small> : null}</span>
+              <button className="btn btn-sm btn-outline-secondary" onClick={() => setComparePanel({ open: false, policyId: null, versions: [], busy: false, error: null })}>Close</button>
+            </div>
+            <div className="card-body">
+              {comparePanel.error && <div className="alert alert-warning" role="alert">{comparePanel.error}</div>}
+              {comparePanel.busy ? (
+                <div className="text-muted">Loading versions…</div>
+              ) : comparePanel.versions.length <= 1 ? (
+                <div className="text-muted">Need at least two versions to compare.</div>
+              ) : (
+                <>
+                  <div className="row g-3 align-items-end">
+                    <div className="col-md-4">
+                      <label className="form-label">Left version</label>
+                      <select className="form-select" value={comparePanel.leftVersion ?? ''} onChange={(e) => onSelectCompareSide('left', e.target.value ? Number(e.target.value) : undefined)}>
+                        <option value="">Select…</option>
+                        {comparePanel.versions.map(v => (
+                          <option key={v.id} value={v.version}>v{v.version} {v.is_active ? '(active)' : ''}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label">Right version</label>
+                      <select className="form-select" value={comparePanel.rightVersion ?? ''} onChange={(e) => onSelectCompareSide('right', e.target.value ? Number(e.target.value) : undefined)}>
+                        <option value="">Select…</option>
+                        {comparePanel.versions.map(v => (
+                          <option key={v.id} value={v.version}>v{v.version} {v.is_active ? '(active)' : ''}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label">Active Version</label>
+                      <div>
+                        {(() => {
+                          const act = comparePanel.versions.find(v => v.is_active);
+                          return act ? <span>v{act.version}</span> : <span>—</span>;
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <label className="form-label">Diff (Left → Right)</label>
+                    {comparePanel.diff ? (
+                      <div className="bg-light p-3 border rounded" style={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap', fontSize: '0.9rem' }}>
+                        {comparePanel.diff.split('\n').map((ln, idx) => {
+                          const isAdd = ln.startsWith('+ ');
+                          const isDel = ln.startsWith('- ');
+                          const style: React.CSSProperties = {
+                            paddingLeft: '8px',
+                            backgroundColor: isAdd ? '#d1e7dd' : isDel ? '#fff3cd' : undefined,
+                            borderLeft: isAdd ? '4px solid #198754' : isDel ? '4px solid #ffc107' : undefined,
+                          };
+                          return (
+                            <div key={idx} style={style}>{ln}</div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="bg-light p-3 border rounded text-muted" style={{ whiteSpace: 'pre-wrap', fontSize: '0.9rem' }}>
+                        Select two versions to see a diff.
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+        {selectedJson && (
+          <div className="card mb-3">
+            <div className="card-header d-flex justify-content-between align-items-center">
+              <span>Policy JSON (ID: {selectedJson.policyId}) {selectedJson.activeVersion ? <small className="text-muted">- active v{selectedJson.activeVersion}</small> : null}</span>
+              <button className="btn btn-sm btn-outline-secondary" onClick={() => setSelectedJson(null)}>Close</button>
+            </div>
+            <div className="card-body">
+              {selectedJson.error && (
+                <div className="alert alert-warning" role="alert">{selectedJson.error}</div>
+              )}
+              <form className="mb-2" onSubmit={async (e) => {
+                e.preventDefault();
+                setSelectedJson((s) => (s ? { ...s, busy: true, error: null } : s));
+                try {
+                  const pid = selectedJson?.policyId;
+                  const doc = JSON.parse(selectedJson!.jsonText);
+                  const pv = await addVersion(pid!, doc, true);
+                  // Update the JSON panel and the table row to reflect new active version immediately
+                  setSelectedJson((s) => (s ? { ...s, busy: false, activeVersion: pv.version, lastSaved: pv.version } : s));
+                  if (pid) {
+                    setRow(pid, { lastVersion: pv });
+                  }
+                } catch (err: any) {
+                  const msg = err?.message ?? 'Failed to save new version';
+                  setSelectedJson((s) => (s ? { ...s, busy: false, error: msg } : s));
+                }
+              }}>
+                <label className="form-label">Active Policy Document (JSON)</label>
+                <textarea
+                  className="form-control"
+                  rows={12}
+                  value={selectedJson.jsonText}
+                  onChange={(e) => setSelectedJson((s) => (s ? { ...s, jsonText: e.target.value, error: null } : s))}
+                />
+                <div className="d-flex gap-2 mt-2">
+                  <button className="btn btn-primary" disabled={selectedJson.busy}>
+                    {selectedJson.busy ? 'Saving…' : 'Save as new active version'}
+                  </button>
+                  {selectedJson.lastSaved ? <span className="text-muted">Saved v{selectedJson.lastSaved}</span> : null}
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
         <div className="card">
           <div className="card-header">Create Policy</div>
           <div className="card-body">
@@ -370,7 +610,14 @@ const Policies: React.FC = () => {
                           </div>
                         </div>
                       </td>
-                      <td>
+                      <td className="d-flex gap-2">
+                        <button
+                          className="btn btn-sm btn-outline-primary"
+                          title="Compare versions"
+                          onClick={async () => openCompare(p.id)}
+                        >
+                          Compare
+                        </button>
                         <button
                           className="btn btn-sm btn-outline-danger"
                           title="Delete policy"
@@ -384,6 +631,15 @@ const Policies: React.FC = () => {
                           }}
                         >
                           Delete
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline-secondary"
+                          title="View / Edit policy"
+                          onClick={async () => {
+                            await loadSelectedJson(p.id);
+                          }}
+                        >
+                          View
                         </button>
                       </td>
                     </tr>

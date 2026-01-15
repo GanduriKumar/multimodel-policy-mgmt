@@ -28,6 +28,11 @@ type PolicyListResponse = {
   total: number;
 };
 
+type PolicyVersionListResponse = {
+  items: PolicyVersionOut[];
+  total: number;
+};
+
 export type CreatePolicyPayload = {
   tenant_id: number;
   name: string;
@@ -174,6 +179,55 @@ export function usePolicies(client: ApiClient = apiDefault) {
     [client]
   );
 
+  const listVersions = useCallback(
+    async (policyId: number, opts?: { offset?: number; limit?: number }) => {
+      setError(null);
+      try {
+        const params = { offset: opts?.offset ?? 0, limit: opts?.limit ?? 100 } as const;
+        const res = await client.apiGet<PolicyVersionListResponse>(`/policies/${policyId}/versions`, params as any);
+        return res;
+      } catch (err: any) {
+        const e = err instanceof Error ? err : new Error(String(err?.message ?? 'Failed to list versions'));
+        if (mountedRef.current) setError(e);
+        throw e;
+      }
+    },
+    [client]
+  );
+
+  const getPolicy = useCallback(
+    async (policyId: number) => {
+      setError(null);
+      try {
+        const pol = await client.apiGet<PolicyOut>(`/policies/${policyId}`);
+        return pol;
+      } catch (err: any) {
+        const e = err instanceof Error ? err : new Error(String(err?.message ?? 'Failed to load policy'));
+        if (mountedRef.current) setError(e);
+        throw e;
+      }
+    },
+    [client]
+  );
+
+  const updatePolicy = useCallback(
+    async (policyId: number, fields: Partial<Pick<PolicyOut, 'name'|'slug'|'description'|'is_active'>>) => {
+      setError(null);
+      try {
+        const updated = await client.apiPost<PolicyOut, typeof fields>(`/policies/${policyId}/update`, fields);
+        if (mountedRef.current) {
+          setItems((prev) => prev.map((p) => (p.id === policyId ? { ...p, ...updated } : p)));
+        }
+        return updated;
+      } catch (err: any) {
+        const e = err instanceof Error ? err : new Error(String(err?.message ?? 'Failed to update policy'));
+        if (mountedRef.current) setError(e);
+        throw e;
+      }
+    },
+    [client]
+  );
+
   const resetError = useCallback(() => setError(null), []);
 
   return {
@@ -188,6 +242,9 @@ export function usePolicies(client: ApiClient = apiDefault) {
     addVersion,
     activateVersion,
     getActiveVersion,
+    listVersions,
+    getPolicy,
+    updatePolicy,
     deletePolicy,
     resetError,
   };

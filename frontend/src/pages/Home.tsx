@@ -59,7 +59,6 @@ const Home: React.FC = () => {
 
       <nav className="mb-4">
         <a className="btn btn-primary me-2" href="/protect">Try Protect</a>
-        <a className="btn btn-outline-secondary" href="/">Home</a>
       </nav>
 
       <section className="mb-4">

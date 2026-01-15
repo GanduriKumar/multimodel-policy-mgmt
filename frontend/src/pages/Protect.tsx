@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import useProtect, { type ProtectPayload, type ProtectResponse } from '../hooks/useProtect';
 
 const Protect: React.FC = () => {
@@ -41,6 +41,48 @@ const Protect: React.FC = () => {
     } catch {
       // Error is handled via hook's error state
     }
+  };
+
+  // Helpers to present user-friendly results
+  const splitReasons = (reasons: string[] = []) => {
+    const policy: string[] = [];
+    const risk: string[] = [];
+    for (const r of reasons) {
+      if (
+        r.startsWith('prompt_injection:') ||
+        r.startsWith('pii_like:') ||
+        r.startsWith('secret_like:') ||
+        r.startsWith('risk_above_threshold') ||
+        r === 'evidence_missing'
+      ) {
+        risk.push(r);
+      } else {
+        policy.push(r);
+      }
+    }
+    return { policy, risk };
+  };
+
+  const formatReason = (r: string): string => {
+    if (r === 'evidence_missing') return 'No supporting evidence provided';
+    if (r.startsWith('missing_evidence:')) return `Missing required evidence: ${r.split(':')[1]}`;
+    if (r.startsWith('blocked_term:')) return `Blocked term found: "${r.split(':')[1]}"`;
+    if (r.startsWith('pii_denied:')) return `Contains restricted personal data: ${r.split(':')[1].replace(/_/g, ' ')}`;
+    if (r.startsWith('prompt_injection:')) return `Prompt-injection pattern detected: ${r.split(':')[1].replace(/_/g, ' ')}`;
+    if (r.startsWith('secret_like:')) return `Looks like a secret: ${r.split(':')[1].replace(/_/g, ' ')}`;
+    if (r.startsWith('pii_like:')) return `May contain personal data: ${r.split(':')[1].replace(/_/g, ' ')}`;
+    if (r.startsWith('risk_above_threshold:')) {
+      const rest = r.split(':')[1] || '';
+      const [lhs, rhs] = rest.split('>=');
+      return `Risk score ${lhs} exceeds threshold ${rhs}`;
+    }
+    return r;
+  };
+
+  const riskBadge = (score: number) => {
+    if (score >= 67) return { label: 'High', className: 'badge bg-danger' };
+    if (score >= 33) return { label: 'Medium', className: 'badge bg-warning text-dark' };
+    return { label: 'Low', className: 'badge bg-success' };
   };
 
   return (
@@ -114,7 +156,7 @@ const Protect: React.FC = () => {
 
         <div className="mt-3">
           <label htmlFor="inputText" className="form-label">
-            Input Text
+            Content to evaluate
           </label>
           <textarea
             id="inputText"
@@ -149,28 +191,67 @@ const Protect: React.FC = () => {
             Decision: {data.allowed ? 'Allowed' : 'Denied'}
           </div>
           <div className="card-body">
-            <p className="mb-1">
-              <strong>Risk Score:</strong> {data.risk_score}
-            </p>
-            <p className="mb-1">
-              <strong>Request Log ID:</strong> {data.request_log_id ?? '—'}
-            </p>
-            <p className="mb-3">
-              <strong>Decision Log ID:</strong> {data.decision_log_id ?? '—'}
-            </p>
+            <div className="d-flex align-items-center gap-2 mb-2">
+              <strong>Risk score:</strong>
+              <span>{data.risk_score}</span>
+              <span className={riskBadge(data.risk_score).className}>{riskBadge(data.risk_score).label}</span>
+            </div>
 
-            <h6 className="mb-2">Reasons</h6>
-            {data.reasons && data.reasons.length > 0 ? (
-              <ul className="list-group">
-                {data.reasons.map((r, idx) => (
-                  <li key={`${r}-${idx}`} className="list-group-item">
-                    {r}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-muted">No reasons reported.</p>
+            <div className="text-muted small mb-3">
+              Final decision = Policy checks passed AND Risk score below threshold. Even with a low risk score, missing required
+              evidence, blocked terms, or PII rules can deny the request.
+            </div>
+
+            {!data.allowed && (
+              <div className="alert alert-warning" role="alert">
+                Decision denied. Risk is {riskBadge(data.risk_score).label.toLowerCase()}, but one or more policy checks failed.
+                See details below.
+              </div>
             )}
+
+            {(() => {
+              const parts = splitReasons(data.reasons || []);
+              return (
+                <div className="row g-3">
+                  <div className="col-md-6">
+                    <h6 className="mb-2">Policy checks</h6>
+                    {parts.policy.length ? (
+                      <ul className="list-group">
+                        {parts.policy.map((r, idx) => (
+                          <li key={`p-${idx}`} className="list-group-item">
+                            {formatReason(r)}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-muted">No policy issues found.</p>
+                    )}
+                  </div>
+                  <div className="col-md-6">
+                    <h6 className="mb-2">Risk checks</h6>
+                    {parts.risk.length ? (
+                      <ul className="list-group">
+                        {parts.risk.map((r, idx) => (
+                          <li key={`r-${idx}`} className="list-group-item">
+                            {formatReason(r)}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-muted">No risk indicators found.</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
+            <details className="mt-3">
+              <summary className="text-muted">Technical details</summary>
+              <div className="mt-2 small text-muted">
+                <div>Request Log ID: {data.request_log_id ?? '—'}</div>
+                <div>Decision Log ID: {data.decision_log_id ?? '—'}</div>
+              </div>
+            </details>
           </div>
         </div>
       )}

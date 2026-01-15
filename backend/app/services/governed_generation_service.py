@@ -56,13 +56,13 @@ class GovernedGenerationService:
         # 1) Governance: record incoming request and start a trace
         trace_id = self.rag.start_session({
             "tenant_id": request.tenant_id,
-            "policy_slug": request.policy_slug,
+            "policy_id": getattr(request, "policy_id", None),
         })
         self.ledger.append_entry(
             "request",
             {
                 "tenant_id": request.tenant_id,
-                "policy_slug": request.policy_slug,
+                "policy_id": getattr(request, "policy_id", None),
                 "input_preview": request.input_text[:256],
             },
             trace_id,
@@ -72,7 +72,7 @@ class GovernedGenerationService:
         result = self.decision_service.protect(
             tenant_id=request.tenant_id,
             input_text=request.input_text,
-            policy_slug=request.policy_slug,
+            policy_id=getattr(request, "policy_id", None),
             evidence_types=request.evidence_types,
             request_id=request.request_id,
             user_agent=None,

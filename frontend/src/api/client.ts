@@ -47,11 +47,11 @@ async function handleResponse<T>(res: Response): Promise<T> {
   const isJson = ct.includes("application/json");
   const data = isJson ? await res.json().catch(() => undefined) : await res.text().catch(() => undefined);
   if (!res.ok) {
-    // Surface common FastAPI error shapes:
+    // Surface common FastAPI error shapes without HTTP code prefixes:
     // - { detail: string | array }
     // - { message: string }
     // - { error: { message: string } }
-    let message = `HTTP ${res.status}`;
+    let message = 'Request failed';
     if (data && typeof data === "object") {
       const anyData: any = data;
       if (typeof anyData.detail === "string" && anyData.detail.trim()) {
@@ -65,7 +65,12 @@ async function handleResponse<T>(res: Response): Promise<T> {
       } else if (anyData.error?.message) {
         message = String(anyData.error.message);
       }
+    } else if (typeof data === 'string' && data.trim()) {
+      // Plain-text error body; show it as-is
+      message = data.trim();
     }
+    // Strip any leading HTTP status prefixes like "400:" or "HTTP 400"
+    message = message.replace(/^\s*(?:HTTP\s*)?\d{3}\s*:?-?\s*/i, "").trim();
     const err: any = new Error(message);
     err.status = res.status;
     err.data = data;

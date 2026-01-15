@@ -24,6 +24,8 @@ from app.schemas.policies import (
     PolicyListResponse,
     PolicyVersionCreate,
     PolicyVersionOut,
+    PolicyVersionListResponse,
+    PolicyUpdate,
 )
 
 router = APIRouter(prefix="/api/policies", tags=["policies"])
@@ -164,6 +166,21 @@ def get_active_policy_version(
     return _to_model(PolicyVersionOut, pv)
 
 
+@router.get("/{policy_id}/versions", response_model=PolicyVersionListResponse)
+def list_policy_versions(
+    policy_id: int = Path(..., ge=1),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    repo: PolicyRepo = Depends(get_policy_repo),
+) -> PolicyVersionListResponse:
+    """
+    List versions for a policy (newest first).
+    """
+    items = repo.list_versions(policy_id=policy_id, offset=offset, limit=limit)
+    items_out = [_to_model(PolicyVersionOut, v) for v in items]
+    return PolicyVersionListResponse(items=items_out, total=len(items_out))
+
+
 @router.post("/{policy_id}/delete", status_code=status.HTTP_204_NO_CONTENT)
 def delete_policy(
     policy_id: int = Path(..., ge=1),
@@ -180,3 +197,41 @@ def delete_policy(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
         return
     raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Delete not supported")
+
+
+@router.get("/{policy_id}", response_model=PolicyOut)
+def get_policy(
+    policy_id: int = Path(..., ge=1),
+    repo: PolicyRepo = Depends(get_policy_repo),
+) -> PolicyOut:
+    """
+    Return a single policy by id.
+    """
+    if hasattr(repo, "get_policy_by_id"):
+        pol = getattr(repo, "get_policy_by_id")(int(policy_id))  # type: ignore[misc]
+        if pol is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Policy not found")
+        return _to_model(PolicyOut, pol)
+    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Get by id not supported")
+
+
+@router.post("/{policy_id}/update", response_model=PolicyOut)
+def update_policy_route(
+    policy_id: int = Path(..., ge=1),
+    payload: PolicyUpdate = ...,
+    repo: PolicyRepo = Depends(get_policy_repo),
+) -> PolicyOut:
+    """
+    Update mutable fields of a policy. Using POST for simplicity.
+    """
+    try:
+        pol = repo.update_policy(
+            int(policy_id),
+            name=payload.name,
+            slug=payload.slug,
+            description=payload.description,
+            is_active=payload.is_active,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    return _to_model(PolicyOut, pol)

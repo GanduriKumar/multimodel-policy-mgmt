@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import Optional, Sequence
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.hashing import sha256_text
@@ -76,10 +77,34 @@ class SqlAlchemyAuditRepo:
             client_ip=client_ip,
             metadata_json=metadata,
         )
-        self.session.add(req)
-        self.session.commit()
-        self.session.refresh(req)
-        return req
+        try:
+            self.session.add(req)
+            self.session.commit()
+            self.session.refresh(req)
+            return req
+        except IntegrityError as ie:
+            # Handle de-duplication collisions gracefully: return the existing row
+            self.session.rollback()
+            # Prefer lookup by (tenant_id, input_hash) when available
+            if ihash:
+                stmt = select(RequestLog).where(
+                    RequestLog.tenant_id == tenant_id,
+                    RequestLog.input_hash == ihash,
+                )
+                existing = self.session.execute(stmt).scalars().first()
+                if existing is not None:
+                    return existing
+            # Fallback: lookup by (tenant_id, request_id) if provided
+            if request_id:
+                stmt = select(RequestLog).where(
+                    RequestLog.tenant_id == tenant_id,
+                    RequestLog.request_id == request_id,
+                )
+                existing = self.session.execute(stmt).scalars().first()
+                if existing is not None:
+                    return existing
+            # If we cannot resolve, re-raise
+            raise
 
     def get_request(self, request_log_id: int) -> Optional[RequestLog]:
         stmt = select(RequestLog).where(RequestLog.id == int(request_log_id))
@@ -125,10 +150,22 @@ class SqlAlchemyAuditRepo:
             policy_version_id=policy_version_id,
             risk_score=risk_score,
         )
-        self.session.add(dec)
-        self.session.commit()
-        self.session.refresh(dec)
-        return dec
+        try:
+            self.session.add(dec)
+            self.session.commit()
+            self.session.refresh(dec)
+            return dec
+        except IntegrityError:
+            # Ensure single decision per (tenant, request). Return existing row.
+            self.session.rollback()
+            stmt = select(DecisionLog).where(
+                DecisionLog.tenant_id == tenant_id,
+                DecisionLog.request_log_id == request_log_id,
+            )
+            existing = self.session.execute(stmt).scalars().first()
+            if existing is not None:
+                return existing
+            raise
 
     def get_decision_detail(self, request_log_id: int) -> Optional[DecisionLog]:
         """
@@ -172,10 +209,22 @@ class SqlAlchemyAuditRepo:
             policy_version_id=policy_version_id,
             evidence_present=bool(evidence_present),
         )
-        self.session.add(rs)
-        self.session.commit()
-        self.session.refresh(rs)
-        return rs
+        try:
+            self.session.add(rs)
+            self.session.commit()
+            self.session.refresh(rs)
+            return rs
+        except IntegrityError:
+            # One risk score per (tenant, request). Return existing row.
+            self.session.rollback()
+            stmt = select(RiskScore).where(
+                RiskScore.tenant_id == tenant_id,
+                RiskScore.request_log_id == request_log_id,
+            )
+            existing = self.session.execute(stmt).scalars().first()
+            if existing is not None:
+                return existing
+            raise
 
     def get_risk_for_request(self, request_log_id: int) -> Optional[RiskScore]:
         stmt = select(RiskScore).where(RiskScore.request_log_id == int(request_log_id))

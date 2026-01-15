@@ -99,7 +99,7 @@ class DecisionService:
         *,
         tenant_id: int,
         input_text: str,
-        policy_slug: str,
+        policy_id: int,
         evidence_types: Optional[Set[str]] = None,
         request_id: Optional[str] = None,
         user_agent: Optional[str] = None,
@@ -110,7 +110,7 @@ class DecisionService:
         return protect(
             tenant_id=tenant_id,
             input_text=input_text,
-            policy_slug=policy_slug,
+            policy_id=policy_id,
             evidence_types=evidence_types,
             policy_repo=self.policy_repo,
             evidence_repo=self.evidence_repo,

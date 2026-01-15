@@ -5,7 +5,7 @@ const NavBar: React.FC = () => {
   return (
     <nav className="navbar navbar-expand-lg navbar-light bg-light border-bottom">
       <div className="container">
-        <NavLink className="navbar-brand fw-semibold" to="/">
+        <NavLink className="navbar-brand fw-semibold text-primary" to="/">
           SatyaSethu
         </NavLink>
 
@@ -28,7 +28,7 @@ const NavBar: React.FC = () => {
                 to="/"
                 end
                 className={({ isActive }) =>
-                  `nav-link${isActive ? ' active fw-semibold' : ''}`
+                  `nav-link text-primary${isActive ? ' active fw-semibold' : ''}`
                 }
               >
                 Home
@@ -39,7 +39,7 @@ const NavBar: React.FC = () => {
               <NavLink
                 to="/policies"
                 className={({ isActive }) =>
-                  `nav-link${isActive ? ' active fw-semibold' : ''}`
+                  `nav-link text-primary${isActive ? ' active fw-semibold' : ''}`
                 }
               >
                 Policies
@@ -50,7 +50,7 @@ const NavBar: React.FC = () => {
               <NavLink
                 to="/protect"
                 className={({ isActive }) =>
-                  `nav-link${isActive ? ' active fw-semibold' : ''}`
+                  `nav-link text-primary${isActive ? ' active fw-semibold' : ''}`
                 }
               >
                 Protect
@@ -61,7 +61,7 @@ const NavBar: React.FC = () => {
               <NavLink
                 to="/evidence"
                 className={({ isActive }) =>
-                  `nav-link${isActive ? ' active fw-semibold' : ''}`
+                  `nav-link text-primary${isActive ? ' active fw-semibold' : ''}`
                 }
               >
                 Evidence
@@ -72,7 +72,7 @@ const NavBar: React.FC = () => {
               <NavLink
                 to="/audit"
                 className={({ isActive }) =>
-                  `nav-link${isActive ? ' active fw-semibold' : ''}`
+                  `nav-link text-primary${isActive ? ' active fw-semibold' : ''}`
                 }
               >
                 Audit
