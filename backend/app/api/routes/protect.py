@@ -31,7 +31,7 @@ def protect_endpoint(
         result = service.protect(
             tenant_id=payload.tenant_id,
             input_text=payload.input_text,
-            policy_slug=payload.policy_slug,
+            policy_id=payload.policy_id,
             evidence_types=payload.evidence_types,
             request_id=payload.request_id,
             user_agent=payload.user_agent,

@@ -6,7 +6,7 @@ const Protect: React.FC = () => {
 
   // Basic form state
   const [tenantId, setTenantId] = useState<number>(1);
-  const [policySlug, setPolicySlug] = useState<string>('content-policy');
+  const [policyId, setPolicyId] = useState<number>(1);
   const [inputText, setInputText] = useState<string>('');
   const [evidenceTypesCsv, setEvidenceTypesCsv] = useState<string>('');
   const [evidenceIdsCsv, setEvidenceIdsCsv] = useState<string>(''); // optional UI only
@@ -27,7 +27,7 @@ const Protect: React.FC = () => {
 
     const payload: ProtectPayload = {
       tenant_id: tenantId,
-      policy_slug: policySlug,
+      policy_id: policyId,
       input_text: inputText,
       evidence_types: evidence_types.length ? evidence_types : undefined,
       // evidenceIdsCsv is currently not used by the backend route; it’s shown for UI parity
@@ -68,15 +68,16 @@ const Protect: React.FC = () => {
             />
           </div>
           <div className="col-sm-5">
-            <label htmlFor="policySlug" className="form-label">
-              Policy Slug
+            <label htmlFor="policyId" className="form-label">
+              Policy ID
             </label>
             <input
-              id="policySlug"
-              type="text"
+              id="policyId"
+              type="number"
+              min={1}
               className="form-control"
-              value={policySlug}
-              onChange={(e) => setPolicySlug(e.target.value)}
+              value={policyId}
+              onChange={(e) => setPolicyId(Number(e.target.value))}
               required
             />
           </div>

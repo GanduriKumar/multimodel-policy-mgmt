@@ -79,6 +79,21 @@ class SqlAlchemyPolicyRepo:
         if not isinstance(slug, str) or not slug.strip():
             raise ValueError("slug must be a non-empty string")
 
+        # Proactive uniqueness checks to return specific validation errors
+        name_exists = self.session.execute(
+            select(Policy.id).where(Policy.tenant_id == tenant_id, Policy.name == name.strip())
+        ).scalar() is not None
+        slug_exists = self.session.execute(
+            select(Policy.id).where(Policy.tenant_id == tenant_id, Policy.slug == slug.strip())
+        ).scalar() is not None
+
+        if name_exists or slug_exists:
+            if name_exists and slug_exists:
+                raise ValueError("name and slug already exist for this tenant")
+            if name_exists:
+                raise ValueError("name already exists for this tenant")
+            raise ValueError("slug already exists for this tenant")
+
         policy = Policy(
             tenant_id=tenant_id,
             name=name.strip(),
@@ -131,6 +146,16 @@ class SqlAlchemyPolicyRepo:
             raise ValueError("Policy update failed due to uniqueness constraint") from exc
         self.session.refresh(policy)
         return policy
+
+    def delete_policy(self, policy_id: int) -> None:
+        """
+        Delete a policy by id (cascades to versions via FK ondelete settings).
+        """
+        pol = self.get_policy_by_id(int(policy_id))
+        if pol is None:
+            raise ValueError("Policy not found")
+        self.session.delete(pol)
+        self.session.commit()
 
     # -------------------------------
     # Version operations

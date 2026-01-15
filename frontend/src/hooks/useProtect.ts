@@ -3,7 +3,7 @@ import apiDefault, { type ApiClient } from '../api/client';
 
 export type ProtectPayload = {
   tenant_id: number;
-  policy_slug: string;
+  policy_id: number;
   input_text: string;
   evidence_types?: string[];
   request_id?: string;

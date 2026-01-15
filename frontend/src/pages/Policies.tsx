@@ -1,8 +1,8 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import usePolicies, { type PolicyOut, type PolicyVersionOut, type CreatePolicyPayload } from '../hooks/usePolicies';
 
 const Policies: React.FC = () => {
-  const { items, total, loading, error, listPolicies, createPolicy, addVersion, activateVersion, resetError } = usePolicies();
+  const { items, total, loading, error, listPolicies, createPolicy, addVersion, activateVersion, getActiveVersion, deletePolicy, resetError } = usePolicies();
 
   // Tenant selector
   const [tenantId, setTenantId] = useState<number>(1);
@@ -41,6 +41,31 @@ const Policies: React.FC = () => {
   const setRow = useCallback((policyId: number, partial: Partial<RowState>) => {
     setRowState((prev) => ({ ...prev, [policyId]: { ...getRow(policyId), ...partial } }));
   }, [getRow]);
+
+  // Auto-load policies when page mounts or tenant changes
+  useEffect(() => {
+    // best-effort load
+    listPolicies(tenantId, { offset: 0, limit: 50 }).catch(() => {/* handled by hook */});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
+
+  // For each listed policy, fetch its currently active version if unknown
+  useEffect(() => {
+    (async () => {
+      for (const p of items) {
+        const rs = rowState[p.id];
+        if (rs === undefined || rs.lastVersion === undefined) {
+          try {
+            const cur = await getActiveVersion(p.id);
+            setRow(p.id, { lastVersion: cur ?? null });
+          } catch {
+            // ignore per-row fetch issues; shown when interacting
+          }
+        }
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
 
   const onLoad = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,12 +126,51 @@ const Policies: React.FC = () => {
       setRow(policy.id, { error: 'Enter a valid version number (>= 1)' });
       return;
     }
+    // Always check the current active version before attempting activation
+    try {
+      const cur = await getActiveVersion(policy.id);
+      if (cur) {
+        setRow(policy.id, { lastVersion: cur });
+        if (cur.version === versionNum && cur.is_active) {
+          setRow(policy.id, { error: 'selected version is already active' });
+          return;
+        }
+      }
+    } catch {
+      // If fetch fails or no active, proceed to activation attempt
+    }
+    // If the selected version is already active (based on last known state), show info and skip call
+    if (rs.lastVersion && rs.lastVersion.version === versionNum && rs.lastVersion.is_active) {
+      setRow(policy.id, { error: 'selected version is already active' });
+      return;
+    }
     setRow(policy.id, { busy: true, error: null });
     try {
       const pv = await activateVersion(policy.id, versionNum);
-      setRow(policy.id, { busy: false, lastVersion: pv });
+      setRow(policy.id, { busy: false, lastVersion: pv, error: null });
     } catch (e: any) {
-      setRow(policy.id, { busy: false, error: e?.message ?? 'Failed to activate version' });
+      // If activation failed due to not found, verify current active and update UI to avoid stale error
+      const msg = String(e?.message ?? 'Failed to activate version');
+      // Fallback: if our last known version already matches and is active, show already-active
+      const curState = getRow(policy.id);
+      if (curState.lastVersion && curState.lastVersion.version === versionNum && curState.lastVersion.is_active) {
+        setRow(policy.id, { busy: false, error: 'selected version is already active' });
+        return;
+      }
+      if (/not found/i.test(msg)) {
+        try {
+          const cur = await getActiveVersion(policy.id);
+          if (cur && cur.version === versionNum) {
+            // It is already active, surface friendly message
+            setRow(policy.id, { busy: false, lastVersion: cur, error: 'selected version is already active' });
+            return;
+          } else if (cur) {
+            setRow(policy.id, { busy: false, lastVersion: cur, error: `Policy version not found (active is v${cur.version})` });
+            return;
+          }
+        } catch { /* ignore follow-up errors */ }
+      }
+      setRow(policy.id, { busy: false, error: msg });
     }
   };
 
@@ -160,7 +224,7 @@ const Policies: React.FC = () => {
                 <input id="name" className="form-control" value={name} onChange={(e) => setName(e.target.value)} required />
               </div>
               <div className="col-md-3">
-                <label htmlFor="slug" className="form-label">Slug</label>
+                <label htmlFor="slug" className="form-label">Policy ID</label>
                 <input id="slug" className="form-control" value={slug} onChange={(e) => setSlug(e.target.value)} required />
               </div>
               <div className="col-md-4">
@@ -203,10 +267,12 @@ const Policies: React.FC = () => {
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Name / Slug</th>
+                  <th>Name / Policy ID</th>
                   <th>Status</th>
+                  <th>Active Version</th>
                   <th>Created</th>
                   <th style={{ width: 450 }}>Versioning</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -217,7 +283,7 @@ const Policies: React.FC = () => {
                       <td>{p.id}</td>
                       <td>
                         <div className="fw-semibold">{p.name}</div>
-                        <code>{p.slug}</code>
+                        <small className="text-muted">ID: <code>{p.id}</code></small>
                         {p.description ? <div className="text-muted small mt-1">{p.description}</div> : null}
                       </td>
                       <td>
@@ -226,6 +292,19 @@ const Policies: React.FC = () => {
                         ) : (
                           <span className="badge bg-secondary">inactive</span>
                         )}
+                      </td>
+                      <td>
+                        {rs.lastVersion
+                          ? (
+                              <span>
+                                v{rs.lastVersion.version} {rs.lastVersion.is_active ? (
+                                  <span className="badge bg-success ms-1">active</span>
+                                ) : (
+                                  <span className="badge bg-secondary ms-1">inactive</span>
+                                )}
+                              </span>
+                            )
+                          : '—'}
                       </td>
                       <td>{fmt(p.created_at)}</td>
                       <td>
@@ -268,7 +347,7 @@ const Policies: React.FC = () => {
                               className="form-control form-control-sm"
                               placeholder="Version # to activate"
                               value={rs.activateInput}
-                              onChange={(e) => setRow(p.id, { activateInput: e.target.value })}
+                              onChange={(e) => setRow(p.id, { activateInput: e.target.value, error: null })}
                             />
                           </div>
                           <div className="col-3 d-grid">
@@ -290,6 +369,22 @@ const Policies: React.FC = () => {
                             )}
                           </div>
                         </div>
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-sm btn-outline-danger"
+                          title="Delete policy"
+                          onClick={async () => {
+                            if (!confirm(`Delete policy ${p.name} (id=${p.id})? This cannot be undone.`)) return;
+                            try {
+                              await deletePolicy(p.id);
+                            } catch (e: any) {
+                              alert(e?.message ?? 'Failed to delete');
+                            }
+                          }}
+                        >
+                          Delete
+                        </button>
                       </td>
                     </tr>
                   );

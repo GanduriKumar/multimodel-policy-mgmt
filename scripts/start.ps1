@@ -1,0 +1,5 @@
+$ErrorActionPreference = 'Stop'
+
+# Open two simple windows and run frontend/backend with reload
+Start-Process powershell -ArgumentList "-NoExit","-ExecutionPolicy","Bypass","-Command","$Host.UI.RawUI.WindowTitle='Policy Backend'; cd '$PSScriptRoot/..'; cd backend; if (Test-Path ../.venv/Scripts/Activate.ps1) { . ../.venv/Scripts/Activate.ps1 }; `$env:ALLOW_ORIGINS='http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174'; Write-Host ALLOW_ORIGINS=`"$env:ALLOW_ORIGINS`"; python -m uvicorn app.main:app --reload --port 8000"
+Start-Process powershell -ArgumentList "-NoExit","-ExecutionPolicy","Bypass","-Command","$Host.UI.RawUI.WindowTitle='Policy Frontend'; cd '$PSScriptRoot/..'; cd frontend; `$env:VITE_API_BASE_URL='http://localhost:8000/api'; Write-Host VITE_API_BASE_URL=`"$env:VITE_API_BASE_URL`"; npm run dev"

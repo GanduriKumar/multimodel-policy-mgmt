@@ -91,7 +91,36 @@ export function usePolicies(client: ApiClient = apiDefault) {
         }
         return created;
       } catch (err: any) {
-        const e = err instanceof Error ? err : new Error(String(err?.message ?? 'Failed to create policy'));
+        // Surface server-provided detail messages for uniqueness and validation errors
+        let message = 'Failed to create policy';
+        const anyErr: any = err;
+        if (anyErr?.message) message = String(anyErr.message);
+        if (anyErr?.data && typeof anyErr.data === 'object') {
+          const d: any = anyErr.data;
+          if (typeof d.detail === 'string') message = d.detail;
+          else if (Array.isArray(d.detail) && d.detail.length) message = d.detail.map((x: any) => x?.msg || x).join('; ');
+          else if (typeof d.message === 'string') message = d.message;
+        }
+        const e = new Error(message);
+        if (mountedRef.current) setError(e);
+        throw e;
+      }
+    },
+    [client]
+  );
+
+  const deletePolicy = useCallback(
+    async (policyId: number) => {
+      setError(null);
+      try {
+        // Using query params since DELETE body may be blocked by intermediaries
+        await client.apiPost(`/policies/${policyId}/delete`, undefined as any);
+        if (mountedRef.current) {
+          setItems((prev) => prev.filter(p => p.id !== policyId));
+          setTotal((t) => Math.max(0, t - 1));
+        }
+      } catch (err: any) {
+        const e = err instanceof Error ? err : new Error(String(err?.message ?? 'Failed to delete policy'));
         if (mountedRef.current) setError(e);
         throw e;
       }
@@ -130,6 +159,21 @@ export function usePolicies(client: ApiClient = apiDefault) {
     [client]
   );
 
+  const getActiveVersion = useCallback(
+    async (policyId: number) => {
+      setError(null);
+      try {
+        const pv = await client.apiGet<PolicyVersionOut | undefined>(`/policies/${policyId}/versions/active`);
+        return pv;
+      } catch (err: any) {
+        const e = err instanceof Error ? err : new Error(String(err?.message ?? 'Failed to fetch active version'));
+        if (mountedRef.current) setError(e);
+        throw e;
+      }
+    },
+    [client]
+  );
+
   const resetError = useCallback(() => setError(null), []);
 
   return {
@@ -143,6 +187,8 @@ export function usePolicies(client: ApiClient = apiDefault) {
     createPolicy,
     addVersion,
     activateVersion,
+    getActiveVersion,
+    deletePolicy,
     resetError,
   };
 }

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any, Type, TypeVar
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Path, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Path, status, Response
 
 from app.core.contracts import PolicyRepo
 from app.core.deps import get_policy_repo
@@ -142,3 +142,41 @@ def activate_policy_version(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
     return _to_model(PolicyVersionOut, pv)
+
+
+@router.get(
+    "/{policy_id}/versions/active",
+    response_model=PolicyVersionOut,
+    responses={204: {"description": "No active version for this policy"}},
+)
+def get_active_policy_version(
+    policy_id: int = Path(..., ge=1),
+    repo: PolicyRepo = Depends(get_policy_repo),
+) -> PolicyVersionOut:
+    """
+    Return the currently active version for a policy.
+    """
+    pv = repo.get_active_version(policy_id)
+    if pv is None:
+        # Return 204 No Content to indicate absence without surfacing an error
+        # Client may treat undefined as "no active version"
+        return Response(status_code=status.HTTP_204_NO_CONTENT)  # type: ignore[return-value]
+    return _to_model(PolicyVersionOut, pv)
+
+
+@router.post("/{policy_id}/delete", status_code=status.HTTP_204_NO_CONTENT)
+def delete_policy(
+    policy_id: int = Path(..., ge=1),
+    repo: PolicyRepo = Depends(get_policy_repo),
+) -> None:
+    """
+    Delete a policy by id. Using POST to avoid issues with DELETE and some proxies.
+    """
+    # Adapter method may be named differently; attempt to call if present
+    if hasattr(repo, "delete_policy"):
+        try:
+            getattr(repo, "delete_policy")(int(policy_id))  # type: ignore[misc]
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+        return
+    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Delete not supported")

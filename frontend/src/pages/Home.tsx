@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import usePolicies, { type PolicyOut } from '../hooks/usePolicies';
+import React, { useEffect, useState } from 'react';
+import usePolicies, { type PolicyOut, type PolicyVersionOut } from '../hooks/usePolicies';
 
 const Home: React.FC = () => {
-  const { items, total, loading, error, listPolicies } = usePolicies();
+  const { items, total, loading, error, listPolicies, getActiveVersion } = usePolicies();
+  const [activeVersions, setActiveVersions] = useState<Record<number, PolicyVersionOut | null>>({});
 
   const [tenantId, setTenantId] = useState<number>(1);
 
@@ -14,6 +15,28 @@ const Home: React.FC = () => {
       // error state handled below
     }
   };
+
+  // Auto-load policies on mount for default tenant
+  useEffect(() => {
+    listPolicies(tenantId, { offset: 0, limit: 50 }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // When items change, fetch active version for each (best-effort)
+  useEffect(() => {
+    (async () => {
+      for (const p of items) {
+        if (!(p.id in activeVersions)) {
+          try {
+            const v = await getActiveVersion(p.id);
+            setActiveVersions((prev) => ({ ...prev, [p.id]: v ?? null }));
+          } catch {
+            setActiveVersions((prev) => ({ ...prev, [p.id]: null }));
+          }
+        }
+      }
+    })();
+  }, [items]);
 
   const fmt = (iso?: string) => {
     if (!iso) return '—';
@@ -80,17 +103,21 @@ const Home: React.FC = () => {
                 <tr>
                   <th scope="col">ID</th>
                   <th scope="col">Name</th>
-                  <th scope="col">Slug</th>
+                  <th scope="col">Policy ID</th>
+                  <th scope="col">Active Version</th>
                   <th scope="col">Active</th>
                   <th scope="col">Created</th>
                 </tr>
               </thead>
               <tbody>
-                {items.map((p: PolicyOut) => (
+                {items.map((p: PolicyOut) => {
+                  const v = activeVersions[p.id];
+                  return (
                   <tr key={p.id}>
                     <td>{p.id}</td>
                     <td>{p.name}</td>
-                    <td><code>{p.slug}</code></td>
+                    <td><code>{p.id}</code></td>
+                    <td>{v ? `v${v.version}` : '—'}</td>
                     <td>
                       {p.is_active ? (
                         <span className="badge bg-success">active</span>
@@ -100,7 +127,7 @@ const Home: React.FC = () => {
                     </td>
                     <td>{fmt(p.created_at)}</td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>

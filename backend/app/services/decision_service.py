@@ -40,7 +40,9 @@ class ProtectResult(TypedDict):
 def _load_active_policy_doc(
     policy_repo: PolicyRepo,
     tenant_id: int,
-    policy_slug: str,
+    *,
+    policy_id: Optional[int] = None,
+    policy_slug: Optional[str] = None,
 ) -> tuple[Optional[dict], Optional[int], Optional[int]]:
     """
     Try to obtain the active policy document (dict) for a tenant's policy slug.
@@ -50,7 +52,7 @@ def _load_active_policy_doc(
     """
     # Path 1: Some implementations expose a direct helper
     try:
-        if hasattr(policy_repo, "get_active_policy_doc"):
+        if hasattr(policy_repo, "get_active_policy_doc") and policy_slug:
             # Not part of the strict Protocol, but used if available.
             doc = getattr(policy_repo, "get_active_policy_doc")(tenant_id, policy_slug)  # type: ignore[attr-defined]
             if isinstance(doc, dict):
@@ -69,7 +71,9 @@ def _load_active_policy_doc(
 
     # Path 2: Strict Protocol sequence
     pol = None
-    if hasattr(policy_repo, "get_policy_by_slug"):
+    if policy_id is not None and hasattr(policy_repo, "get_policy_by_id"):
+        pol = policy_repo.get_policy_by_id(int(policy_id))  # type: ignore[attr-defined]
+    elif policy_slug and hasattr(policy_repo, "get_policy_by_slug"):
         pol = policy_repo.get_policy_by_slug(tenant_id, policy_slug)  # type: ignore[call-arg]
     if pol is None:
         return None, None, None
@@ -88,7 +92,7 @@ def protect(
     *,
     tenant_id: int,
     input_text: str,
-    policy_slug: str,
+    policy_id: int,
     evidence_types: Optional[Set[str]],
     policy_repo: PolicyRepo,
     evidence_repo: EvidenceRepo,  # kept for future use; Protocol-only dependency
@@ -119,8 +123,8 @@ def protect(
     """
     if not isinstance(input_text, str):
         raise TypeError("input_text must be a str")
-    if not isinstance(policy_slug, str) or not policy_slug.strip():
-        raise ValueError("policy_slug must be a non-empty string")
+    if not isinstance(policy_id, int) or policy_id < 1:
+        raise ValueError("policy_id must be a positive integer")
 
     ev_types: Set[str] = set(evidence_types or set())
 
@@ -139,7 +143,7 @@ def protect(
 
     # 2) Load active policy document
     policy_doc_dict, policy_id, policy_version_id = _load_active_policy_doc(
-        policy_repo=policy_repo, tenant_id=tenant_id, policy_slug=policy_slug
+        policy_repo=policy_repo, tenant_id=tenant_id, policy_id=policy_id
     )
 
     # Default policy if none exists: permissive with high threshold

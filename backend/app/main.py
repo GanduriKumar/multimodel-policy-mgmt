@@ -84,6 +84,41 @@ def get_application() -> FastAPI:
     # Register standardized error handlers
     register_exception_handlers(app)
 
+    # Ensure database schema exists (dev-friendly) and seed minimal data
+    # This avoids "no such table" errors on a fresh local run.
+    def _on_startup() -> None:
+        try:
+            # Import models and create tables
+            from app.db.base import Base, import_all_models  # type: ignore
+            from app.db.session import engine, SessionLocal  # type: ignore
+            from sqlalchemy import select, func  # type: ignore
+
+            import_all_models()
+            try:
+                Base.metadata.create_all(bind=engine)
+            except Exception:
+                # Best-effort; in production prefer Alembic migrations
+                pass
+
+            # Seed a default tenant if DB is empty to simplify local testing
+            try:
+                from app.models.tenant import Tenant  # type: ignore
+
+                with SessionLocal() as session:
+                    count = session.execute(select(func.count()).select_from(Tenant)).scalar() or 0
+                    if count == 0:
+                        t = Tenant(name="Default Tenant", slug="default")
+                        session.add(t)
+                        session.commit()
+            except Exception:
+                # Seeding is optional; ignore failures
+                pass
+        except Exception:
+            # Never block app startup due to initialization issues
+            pass
+
+    app.add_event_handler("startup", _on_startup)
+
     # Optional root route (informational only)
     @app.get("/")
     def root() -> dict:

@@ -37,23 +37,23 @@ const NavBar: React.FC = () => {
 
             <li className="nav-item">
               <NavLink
-                to="/protect"
-                className={({ isActive }) =>
-                  `nav-link${isActive ? ' active fw-semibold' : ''}`
-                }
-              >
-                Protect
-              </NavLink>
-            </li>
-
-            <li className="nav-item">
-              <NavLink
                 to="/policies"
                 className={({ isActive }) =>
                   `nav-link${isActive ? ' active fw-semibold' : ''}`
                 }
               >
                 Policies
+              </NavLink>
+            </li>
+
+            <li className="nav-item">
+              <NavLink
+                to="/protect"
+                className={({ isActive }) =>
+                  `nav-link${isActive ? ' active fw-semibold' : ''}`
+                }
+              >
+                Protect
               </NavLink>
             </li>
 
