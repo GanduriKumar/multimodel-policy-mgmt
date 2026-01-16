@@ -1,12 +1,17 @@
 # Multimodel Policy Management
 
-A lightweight, testable policy enforcement and audit system for AI apps. It helps you define versioned policies, evaluate user input and model output (pre/post), compute risk, record decisions for audit, and optionally append evidence to a tamper‑evident governance ledger. It ships with a minimal React frontend for non‑engineers and a clean FastAPI backend for integration.
+Beginner‑friendly safety and audit layer for AI apps. You define simple JSON policies, the system checks text before/after an LLM call, computes a risk score, and logs decisions for audit. A web dashboard lets non‑engineers create policies and run checks without writing code.
 
 - Backend entry: [backend/app/main.py](backend/app/main.py)
 - API router: [backend/app/api/router.py](backend/app/api/router.py)
 - Decision orchestration: [`app.services.decision_service.protect`](backend/app/services/decision_service.py)
 - One‑call orchestration: [`app.services.governed_generation_service`](backend/app/services/governed_generation_service.py)
 - Frontend entry: [frontend/src/main.tsx](frontend/src/main.tsx)
+
+Quick facts
+- Single‑tenant by default (tenant_id=1). The UI hides tenant inputs.
+- Reports (Policy Changes and Decisions) live on the Dashboard (generate and download).
+- Clear layering (route → service → repo/engine) with tests for easy debugging.
 
 ---
 
@@ -237,7 +242,7 @@ Audit exports and ledger (optional, but recommended)
 
 ---
 
-## 4) How to use the frontend service
+## 4) How to use the frontend (Dashboard)
 
 Start the UI
 - cd frontend && npm run dev → http://localhost:5173
@@ -252,17 +257,16 @@ Pages (top navigation) and why they matter
   - Why: versioned rules let you evolve guardrails safely and keep history.
   - Uses hook: [frontend/src/hooks/usePolicies.ts](frontend/src/hooks/usePolicies.ts)
 - Protect
-  - Try POST /api/protect flows live: enter Tenant ID, Policy Slug, the text, and optional Evidence Types.
+  - Try POST /api/protect flows live: enter Policy ID (see the Policies list), the text, and optional Evidence Types.
   - See allowed, reasons, and risk score to validate your policy logic.
-- Evidence
-  - Ingest evidence (url/text) your policies may require and fetch by ID.
-  - Why: some policies depend on supporting artifacts (e.g., citations).
-  - Uses hook: [frontend/src/hooks/useEvidence.ts](frontend/src/hooks/useEvidence.ts)
 - Audit
   - Browse requests and decision details (policy/risk reasons).
   - Export compliance bundles (JSON or HTML, PDF‑ready).
   - Why: compliance and governance—prove what happened and why.
   - UI: [frontend/src/pages/Audit.tsx](frontend/src/pages/Audit.tsx)
+- Dashboard
+  - Live charts and a “Generate & Download” section for Decisions and Policy Changes reports.
+  - Export CSV/NDJSON/JSON/HTML bundles for reviews and demos.
 
 ---
 

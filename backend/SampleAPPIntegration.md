@@ -25,6 +25,7 @@ Prerequisites
     - BACKEND_API_KEY (if backend enforces API keys)
     - BACKEND_API_KEY_HEADER (default x-api-key)
     - OPENAI_MODEL (default gpt-4o-mini)
+    - TENANT_ID (defaults to 1; single-tenant mode)
 
 How it works
 1) Your app asks the backend if text is allowed under a policy:
@@ -32,19 +33,19 @@ How it works
 2) If allowed, your app calls the LLM provider.
 3) Optionally, send the model output back to /api/protect for a post-check.
 
-Run
+Run (tenant defaults to 1)
 
 - Prompt via CLI argument:
-  - python backend/SampleAppIntegration.py --tenant-id 1 --policy-slug content-safety --prompt "Hello!"
+  - python backend/SampleAppIntegration.py --policy-slug content-safety --prompt "Hello!"
 
 - Prompt via STDIN:
-  - echo "Summarize: ..." | python backend/SampleAppIntegration.py --tenant-id 1 --policy-slug content-safety
+  - echo "Summarize: ..." | python backend/SampleAppIntegration.py --policy-slug content-safety
 
 - JSON output (includes pre/post decisions and content):
-  - echo "Hello" | python backend/SampleAppIntegration.py --tenant-id 1 --policy-slug content-safety --json
+  - echo "Hello" | python backend/SampleAppIntegration.py --policy-slug content-safety --json
 
 Options (CLI)
-- --tenant-id: Tenant identifier used by backend policies
+- --tenant-id: Tenant identifier used by backend policies (optional; defaults to 1)
 - --policy-slug: Policy slug to enforce (e.g., content-safety)
 - --prompt: Prompt text; omit to read from STDIN
 - --evidence-types: Comma-separated tags like url,document

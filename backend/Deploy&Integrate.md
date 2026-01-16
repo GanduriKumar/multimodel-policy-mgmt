@@ -8,7 +8,7 @@ What the backend does
 - Optionally appends to a tamper-evident ledger for governance.
 - Offers a one-call orchestration endpoint: POST /api/protect-generate.
 
-How it fits in
+How it fits in (single-tenant by default)
 1) Your app gets user text.
 2) Your app asks the backend: “Is this safe under policy X?”
 3) If allowed, your app calls the LLM provider (or lets the backend do it via /api/protect-generate).

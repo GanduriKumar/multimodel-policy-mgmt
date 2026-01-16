@@ -14,7 +14,7 @@ Welcome! This guide will help you get the **Multimodel Policy Management** syste
 6. [Step 4: Create Your First Policy](#step-4-create-your-first-policy)
 7. [Step 5: Test the System](#step-5-test-the-system)
 8. [How to Provide Evidence (Simple)](#how-to-provide-evidence-simple)
-  - [Use the Evidence Page (Dashboard)](#use-the-evidence-page-dashboard)
+  - [Add Evidence via the API](#add-evidence-via-the-api)
   - [Link Evidence with Policies](#link-evidence-with-policies)
 9. [How to View Audits (Simple)](#how-to-view-audits-simple)
 10. [Step 6: Connect Your Own Application](#step-6-connect-your-own-application)
@@ -238,7 +238,7 @@ A policy is a set of rules. Let's create one to block certain words.
    - **Policy Name**: `Content Safety`
    - **Policy Slug**: `content-safety` (no spaces, lowercase)
    - **Description**: `Blocks unsafe content`
-   - **Tenant ID**: `1` (for now, use 1)
+  - Tenant is fixed to 1 in the UI (single-tenant mode)
 5. Click **"Create Policy"**
 
 Now you'll create a "version" of this policy (a version is a specific set of rules):
@@ -303,7 +303,6 @@ Now let's test that the policy actually works!
 1. Go to http://localhost:5173
 2. Click on **"Protect"** in the navigation menu
 3. In the test form:
-  - **Tenant ID**: `1`
   - **Policy ID**: `1` (tip: see the Policies list to find the ID)
   - **Content to evaluate**: `This is a forbidden word`
   - Click **"Evaluate"**
@@ -395,30 +394,17 @@ Notes:
 - If your policy requires certain types (like ["url", "document"]) and you send none, the system will add reasons like "missing_evidence:url" and may deny the request.
 - The dashboard Protect page has an “Evidence Types (CSV)” field; enter values like: url,document
 
-### Use the Evidence Page (Dashboard)
+### Add Evidence via the API
 
-You can add and review evidence from the dashboard, no coding needed.
+Evidence ingestion is available via the API today. Use the curl examples above to store and fetch evidence.
 
-Steps:
-1) Open http://localhost:5173 and click "Evidence" in the top navigation.
-2) Click "Add Evidence" (or similar button).
-3) Fill the form:
-   - Tenant ID: 1 (or your tenant)
-   - Evidence Type: for example url, document, or text
-   - Source (optional): a URL or identifier (e.g., https://example.com/policy)
-   - Description (optional): a short note like "Official policy page"
-   - Content (optional): paste raw text if you want a content hash saved
-   - Metadata (optional): small JSON like {"topic": "returns"}
-   - Policy link (optional): if the form shows Policy ID / Policy Version, you can link this evidence directly to a policy and version
-4) Save. You’ll see a new evidence row with its ID.
-
-When evaluating in Protect, type the matching tags into "Evidence Types (CSV)" (e.g., url,document). This signals to the policy engine that the required kinds of evidence are present.
+Tip: When evaluating in Protect, type the matching tags into "Evidence Types (CSV)" (e.g., url,document). This signals to the policy engine that the required kinds of evidence are present.
 
 ### Link Evidence with Policies
 
 Linking helps audits and reporting. There are two ways:
 
-1) From the dashboard form (if available):
+1) From your own app or scripts:
    - Enter Policy ID (see Policies page for the ID)
    - Optionally enter the active Policy Version ID (see the Versions panel under the policy)
 
