@@ -51,7 +51,7 @@ const Home: React.FC = () => {
   return (
     <div className="container py-4">
       <header className="mb-4">
-        <p className="text-muted mb-0">
+        <p className="text-muted mb-0 fs-5">
           Multimodel Policy Management: evaluate content against policies and risk engines, manage evidence, and audit decisions.
         </p>
       </header>

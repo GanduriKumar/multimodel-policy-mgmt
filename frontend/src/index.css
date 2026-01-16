@@ -50,6 +50,16 @@ body {
 @media (min-width: 992px) {
   .navbar .navbar-brand { font-size: 2.25rem; }
 }
+/* Brand tagline under the brand name */
+.brand-tagline {
+  margin-top: -0.25rem;
+  color: #5f6368;
+  font-size: 1.125rem; /* larger by ~2 sizes from small */
+  line-height: 1.1;
+}
+@media (min-width: 992px) {
+  .brand-tagline { font-size: 1.375rem; }
+}
 .navbar .nav-link {
   color: #fff !important;
   border-radius: 6px;

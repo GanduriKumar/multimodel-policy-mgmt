@@ -5,9 +5,12 @@ const NavBar: React.FC = () => {
   return (
     <nav className="navbar navbar-expand-lg navbar-light bg-light border-bottom brand-accent">
       <div className="container">
-        <NavLink className="navbar-brand fw-semibold text-primary" to="/">
-          Policy Guard
-        </NavLink>
+        <div className="d-flex flex-column">
+          <NavLink className="navbar-brand fw-semibold text-primary mb-0" to="/">
+            Policy Guard
+          </NavLink>
+          <div className="brand-tagline">Safer AI, simpler controls</div>
+        </div>
 
         <button
           className="navbar-toggler"
@@ -92,9 +95,7 @@ const NavBar: React.FC = () => {
             </li>
           </ul>
 
-          <span className="navbar-text text-muted small">
-            Safer AI, simpler controls
-          </span>
+          {/** Tagline moved under brand */}
         </div>
       </div>
     </nav>
