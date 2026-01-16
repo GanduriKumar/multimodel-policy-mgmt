@@ -37,6 +37,17 @@ const NavBar: React.FC = () => {
 
             <li className="nav-item">
               <NavLink
+                to="/dashboard"
+                className={({ isActive }) =>
+                  `nav-link text-primary${isActive ? ' active fw-semibold' : ''}`
+                }
+              >
+                Dashboard
+              </NavLink>
+            </li>
+
+            <li className="nav-item">
+              <NavLink
                 to="/policies"
                 className={({ isActive }) =>
                   `nav-link text-primary${isActive ? ' active fw-semibold' : ''}`

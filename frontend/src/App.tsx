@@ -6,6 +6,7 @@ import Protect from './pages/Protect';
 import Policies from './pages/Policies';
 import Audit from './pages/Audit';
 import Admin from './pages/Admin';
+import Dashboard from './pages/Dashboard';
 
 const NotFound: React.FC = () => (
   <div className="alert alert-warning" role="alert">
@@ -23,6 +24,7 @@ const App: React.FC = () => {
           <Route path="/" element={<Home />} />
           <Route path="/protect" element={<Protect />} />
           <Route path="/policies" element={<Policies />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           {false && <Route path="/evidence" element={<div />} />}
           <Route path="/audit" element={<Audit />} />
           <Route path="/admin" element={<Admin />} />
