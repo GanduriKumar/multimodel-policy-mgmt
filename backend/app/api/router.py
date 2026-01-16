@@ -11,6 +11,7 @@ Sub-routers included:
 - app.api.routes.audit     -> /api/audit
 - app.api.routes.policies  -> /api/policies
 - app.api.routes.maintenance -> /api/admin
+ - app.api.routes.reports -> /api/reports
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from app.api.routes.policies import router as policies_router
 from app.api.routes.evidence import router as evidence_router
 from app.api.routes.audit import router as audit_router
 from app.api.routes.maintenance import router as maintenance_router
+from app.api.routes.reports import router as reports_router
 
 __all__ = ["router"]
 
@@ -36,3 +38,4 @@ router.include_router(policies_router)
 router.include_router(evidence_router)
 router.include_router(audit_router)
 router.include_router(maintenance_router)
+router.include_router(reports_router)

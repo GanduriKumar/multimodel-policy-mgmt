@@ -1,0 +1,116 @@
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Policy Changes Report — Tenant 1</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  </head>
+  <body>
+    <div class="container py-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h3 mb-0">Policy Changes Report — Tenant 1</h1>
+        <span class="badge bg-secondary">Timezone: Asia/Kolkata</span>
+      </div>
+      <p class="text-muted">Range: preset=last24h, UTC 2026-01-15T03:56:56.569225Z to 2026-01-16T03:56:56.569225Z</p>
+
+      <div class="row g-3">
+        <div class="col-12 col-lg-7">
+          <div class="card">
+            <div class="card-header">Changes per day</div>
+            <div class="card-body">
+              <canvas id="chartChanges" height="120"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-5">
+          <div class="card">
+            <div class="card-header">Changes by policy (top 10)</div>
+            <div class="card-body">
+              <canvas id="chartPolicies" height="120"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mt-4">
+        <div class="card-header">Events</div>
+        <div class="table-responsive">
+          <table class="table table-sm table-striped mb-0">
+            <thead>
+              <tr>
+                <th>policy_id</th><th>policy_name</th><th>version_id</th><th>version</th><th>is_active</th><th>change_type</th><th>changed_at_local</th><th>changed_by</th><th>diff_summary</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>1</td><td>Content Safety</td><td>7</td><td>7</td><td>Yes</td><td>version_created</td><td>2026-01-16T07:32:57+05:30</td><td>Unknown</td><td></td></tr>
+<tr><td>1</td><td>Content Safety</td><td>7</td><td>7</td><td>Yes</td><td>version_activated</td><td>2026-01-16T07:32:57+05:30</td><td>Unknown</td><td></td></tr>
+<tr><td>1</td><td>Content Safety</td><td>1</td><td>1</td><td>No</td><td>version_deactivated</td><td>2026-01-16T07:32:57+05:30</td><td>Unknown</td><td></td></tr>
+<tr><td>1</td><td>Content Safety</td><td>2</td><td>2</td><td>No</td><td>version_deactivated</td><td>2026-01-16T07:32:57+05:30</td><td>Unknown</td><td></td></tr>
+<tr><td>1</td><td>Content Safety</td><td>3</td><td>3</td><td>No</td><td>version_deactivated</td><td>2026-01-16T07:32:57+05:30</td><td>Unknown</td><td></td></tr>
+<tr><td>1</td><td>Content Safety</td><td>4</td><td>4</td><td>No</td><td>version_deactivated</td><td>2026-01-16T07:32:57+05:30</td><td>Unknown</td><td></td></tr>
+<tr><td>1</td><td>Content Safety</td><td>5</td><td>5</td><td>No</td><td>version_deactivated</td><td>2026-01-16T07:32:57+05:30</td><td>Unknown</td><td></td></tr>
+<tr><td>1</td><td>Content Safety</td><td>6</td><td>6</td><td>No</td><td>version_deactivated</td><td>2026-01-16T07:32:57+05:30</td><td>Unknown</td><td></td></tr>
+<tr><td>1</td><td>Content Safety</td><td>6</td><td>6</td><td>No</td><td>version_created</td><td>2026-01-15T16:49:33+05:30</td><td>Unknown</td><td></td></tr>
+<tr><td>1</td><td>Content Safety</td><td>5</td><td>5</td><td>No</td><td>version_created</td><td>2026-01-15T16:49:05+05:30</td><td>Unknown</td><td></td></tr>
+<tr><td>1</td><td>Content Safety</td><td>4</td><td>4</td><td>No</td><td>version_created</td><td>2026-01-15T16:46:40+05:30</td><td>Unknown</td><td></td></tr>
+<tr><td>1</td><td>Content Safety</td><td>3</td><td>3</td><td>No</td><td>version_created</td><td>2026-01-15T16:43:05+05:30</td><td>Unknown</td><td></td></tr>
+<tr><td>1</td><td>Content Safety</td><td>2</td><td>2</td><td>No</td><td>version_created</td><td>2026-01-15T16:38:22+05:30</td><td>Unknown</td><td></td></tr>
+<tr><td>1</td><td>Content Safety</td><td>1</td><td>1</td><td>No</td><td>version_created</td><td>2026-01-15T16:37:51+05:30</td><td>Unknown</td><td></td></tr>
+<tr><td>1</td><td>Content Safety</td><td></td><td></td><td></td><td>policy_created</td><td>2026-01-15T16:37:48+05:30</td><td>Unknown</td><td></td></tr>
+<tr><td>1</td><td>Content Safety</td><td></td><td></td><td></td><td>policy_updated</td><td>2026-01-15T16:37:48+05:30</td><td>Unknown</td><td></td></tr>
+<tr><td>1</td><td>Content Safety</td><td></td><td></td><td></td><td>policy_activated</td><td>2026-01-15T16:37:48+05:30</td><td>Unknown</td><td></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card mt-4">
+        <div class="card-header">Policies with no change (recent)</div>
+        <div class="table-responsive">
+          <table class="table table-sm table-striped mb-0">
+            <thead>
+              <tr>
+                <th>policy_id</th><th>policy_name</th><th>status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan=3 class='text-muted'>No changes in range</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card-body">
+          
+        </div>
+      </div>
+
+    </div>
+
+    <script>
+      (function() {
+        const changes = {"labels": ["2026-01-15", "2026-01-16"], "datasets": [{"label": "policy_activated", "data": [1, 0]}, {"label": "policy_created", "data": [1, 0]}, {"label": "policy_updated", "data": [1, 0]}, {"label": "version_activated", "data": [0, 1]}, {"label": "version_created", "data": [6, 1]}, {"label": "version_deactivated", "data": [0, 6]}]};
+        const ctx1 = document.getElementById('chartChanges');
+        if (ctx1 && window.Chart) {
+          const colors = ['#0d6efd','#198754','#dc3545','#6f42c1','#fd7e14','#20c997'];
+          const ds = changes.datasets.map((d, i) => ({
+            label: d.label,
+            data: d.data,
+            borderColor: colors[i % colors.length],
+            backgroundColor: colors[i % colors.length] + '55',
+            fill: true,
+          }));
+          new Chart(ctx1, { type: 'bar', data: { labels: changes.labels, datasets: ds }, options: { responsive: true, plugins: { legend: { position: 'top' } } } });
+        }
+
+        const pol = {"labels": ["1: Content Safety"], "data": [17]};
+        const ctx2 = document.getElementById('chartPolicies');
+        if (ctx2 && window.Chart) {
+          new Chart(ctx2, { type: 'bar', data: { labels: pol.labels, datasets: [{ label: 'Events', data: pol.data, backgroundColor: '#0d6efd' }] }, options: { indexAxis: 'y', responsive: true } });
+        }
+      })();
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>

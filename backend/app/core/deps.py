@@ -17,12 +17,14 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional, Set
 
-from fastapi import Depends
+from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.contracts import AuditRepo, EvidenceRepo, PolicyRepo
 from app.db.session import get_db
 from app.services.decision_service import ProtectResult, protect
+from app.core.config import get_settings
+from app.services.auth_service import AuthService, AuthError
 
 # Optional imports are guarded to avoid hard failures when optional deps aren't present
 try:  # Optional at import time; concrete implementations may not be used in all contexts
@@ -51,6 +53,8 @@ __all__ = [
     "get_policy_repo",
     "get_evidence_repo",
     "get_audit_repo",
+    # auth
+    "get_api_key",
     # decision
     "DecisionService",
     "get_decision_service",
@@ -171,3 +175,39 @@ def get_governed_generation_service(
         groundedness_engine=get_groundedness_engine(),
         decision_service=decision_service,
     )
+
+# -------------------------------
+# API Key Authentication
+# -------------------------------
+
+def get_api_key(
+    db: Session = Depends(get_db),
+    api_key: Optional[str] = Header(default=None, alias=get_settings().api_key_header),
+):
+    """
+    FastAPI dependency to enforce API key authentication.
+
+    - Reads the API key from the configured header (default: x-api-key)
+    - In non-production environments, missing keys are allowed (dev convenience)
+    - When provided, validates the key against stored tenant API key hashes
+    - Returns the authenticated tenant object (or None in dev when not provided)
+    - Raises 401 on authentication failures in production or when key is invalid
+    """
+    settings = get_settings()
+
+    # Allow no-key in non-production for easier local development and tests
+    if not api_key or not api_key.strip():
+        if settings.app_env.lower() != "production":
+            return None
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing API key")
+
+    # Validate provided key using AuthService and TenantRepo
+    from app.repos.tenant_repo import SqlAlchemyTenantRepo
+
+    auth_service = AuthService(tenant_repo=SqlAlchemyTenantRepo(db))
+    try:
+        tenant = auth_service.authenticate(api_key.strip())
+    except AuthError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc))
+
+    return tenant
