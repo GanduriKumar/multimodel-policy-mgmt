@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 
 const NavBar: React.FC = () => {
   return (
-    <nav className="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+    <nav className="navbar navbar-expand-lg navbar-light bg-light border-bottom brand-accent">
       <div className="container">
         <NavLink className="navbar-brand fw-semibold text-primary" to="/">
           Policy Guard
@@ -28,7 +28,7 @@ const NavBar: React.FC = () => {
                 to="/"
                 end
                 className={({ isActive }) =>
-                  `nav-link text-primary${isActive ? ' active fw-semibold' : ''}`
+                  `nav-link nav-home${isActive ? ' active fw-semibold' : ''}`
                 }
               >
                 Home
@@ -39,7 +39,7 @@ const NavBar: React.FC = () => {
               <NavLink
                 to="/dashboard"
                 className={({ isActive }) =>
-                  `nav-link text-primary${isActive ? ' active fw-semibold' : ''}`
+                  `nav-link nav-dashboard${isActive ? ' active fw-semibold' : ''}`
                 }
               >
                 Dashboard
@@ -50,7 +50,7 @@ const NavBar: React.FC = () => {
               <NavLink
                 to="/policies"
                 className={({ isActive }) =>
-                  `nav-link text-primary${isActive ? ' active fw-semibold' : ''}`
+                  `nav-link nav-policies${isActive ? ' active fw-semibold' : ''}`
                 }
               >
                 Policies
@@ -61,7 +61,7 @@ const NavBar: React.FC = () => {
               <NavLink
                 to="/protect"
                 className={({ isActive }) =>
-                  `nav-link text-primary${isActive ? ' active fw-semibold' : ''}`
+                  `nav-link nav-protect${isActive ? ' active fw-semibold' : ''}`
                 }
               >
                 Protect
@@ -74,7 +74,7 @@ const NavBar: React.FC = () => {
               <NavLink
                 to="/audit"
                 className={({ isActive }) =>
-                  `nav-link text-primary${isActive ? ' active fw-semibold' : ''}`
+                  `nav-link nav-audit${isActive ? ' active fw-semibold' : ''}`
                 }
               >
                 Audit
@@ -84,7 +84,7 @@ const NavBar: React.FC = () => {
               <NavLink
                 to="/admin"
                 className={({ isActive }) =>
-                  `nav-link text-primary${isActive ? ' active fw-semibold' : ''}`
+                  `nav-link nav-admin${isActive ? ' active fw-semibold' : ''}`
                 }
               >
                 Admin

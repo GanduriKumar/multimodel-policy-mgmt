@@ -11,6 +11,8 @@
   --g-red:     #d93025; /* Google Red 600 */
   --g-yellow:  #f9ab00; /* Google Yellow 600 */
   --g-green:   #188038; /* Google Green 700 */
+  --g-grey:    #3c4043; /* Google Grey 800 */
+  --g-charcoal:#202124; /* Google Charcoal */
   --g-surface: #f8f9fa; /* Surface */
   --g-text:    #202124; /* Text */
 
@@ -43,16 +45,60 @@ body {
 }
 .navbar .navbar-brand {
   color: var(--g-blue) !important;
+  font-size: 1.75rem; /* larger brand label */
 }
-.navbar .nav-link { color: var(--g-blue) !important; }
-.navbar .nav-link.active { color: var(--g-blue) !important; }
-.navbar .nav-link:hover { color: #185abc !important; }
+@media (min-width: 992px) {
+  .navbar .navbar-brand { font-size: 2.25rem; }
+}
+.navbar .nav-link {
+  color: #fff !important;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  transition: filter 0.15s ease, box-shadow 0.15s ease;
+}
+.navbar .nav-link:hover,
+.navbar .nav-link:focus {
+  filter: brightness(0.95);
+}
+.navbar .nav-link.active { box-shadow: none; }
+
+/* Route-specific permanent fills using Google/Material palette (no repeats) */
+.navbar .nav-link.nav-home { background-color: var(--g-blue); color: #fff !important; }
+.navbar .nav-link.nav-dashboard { background-color: var(--g-red); color: #fff !important; }
+.navbar .nav-link.nav-policies { background-color: var(--g-green); color: #fff !important; }
+.navbar .nav-link.nav-protect { background-color: var(--g-yellow); color: var(--g-text) !important; }
+.navbar .nav-link.nav-audit { background-color: var(--g-grey); color: #fff !important; }
+.navbar .nav-link.nav-admin { background-color: var(--g-charcoal); color: #fff !important; }
+
+/* Ensure hover/focus keep contrasting text per-item */
+.navbar .nav-link.nav-protect:hover,
+.navbar .nav-link.nav-protect:focus { color: var(--g-text) !important; filter: brightness(0.95); }
 /* Ensure Bootstrap's navbar-light defaults are overridden */
-.navbar-light .navbar-nav .nav-link { color: var(--g-blue) !important; }
-.navbar-light .navbar-nav .nav-link:hover, .navbar-light .navbar-nav .nav-link:focus { color: #185abc !important; }
+.navbar-light .navbar-nav .nav-link { color: #fff !important; }
+.navbar-light .navbar-nav .nav-link:hover, .navbar-light .navbar-nav .nav-link:focus { color: #fff !important; filter: brightness(0.95); }
 .navbar-light .navbar-toggler { border-color: rgba(26,115,232,0.25) !important; }
 .navbar-light .navbar-toggler-icon {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 30 30' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke='rgba(26,115,232,0.9)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E") !important;
+}
+
+/* Add spacing so filled boxes don't touch */
+.navbar .navbar-nav { gap: 0.5rem; }
+.navbar .navbar-nav .nav-item { display: flex; }
+
+/* Navbar Google-brand accent bar */
+.navbar.brand-accent { position: relative; }
+.navbar.brand-accent::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg,
+    var(--g-blue) 0 25%,
+    var(--g-red) 25% 50%,
+    var(--g-yellow) 50% 75%,
+    var(--g-green) 75% 100%);
 }
 
 /* Buttons */

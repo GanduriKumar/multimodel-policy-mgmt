@@ -50,9 +50,6 @@ const Admin: React.FC = () => {
         </div>
       </div>
 
-      <div className="alert alert-info mt-4" role="alert">
-        Report generation has moved to <a href="/dashboard">Dashboard</a>.
-      </div>
     </div>
   );
 };
