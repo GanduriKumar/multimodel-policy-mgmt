@@ -19,13 +19,51 @@ Returns:
 
 from __future__ import annotations
 
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 from app.core.patterns import (
     detect_prompt_injection,
     detect_secret_like,
     detect_pii_like,
+    detect_violence_like,
 )
+
+
+def _local_intent_classifier(text: str) -> Dict[str, float]:
+    """
+    Lightweight heuristic intent classifier.
+    Returns mapping label -> score in [0,1].
+    Labels: weapon_instruction, incite_violence, depict_violence
+    """
+    text_l = text.lower()
+    scores: Dict[str, float] = {}
+    # Weapon instruction heuristics
+    if any(k in text_l for k in ["how to build a bomb", "make a bomb", "build a weapon", "assemble a gun", "explosive recipe", "detonator"]):
+        scores["weapon_instruction"] = 0.9
+    elif any(k in text_l for k in ["how to make", "how to build"]) and any(k in text_l for k in ["bomb", "gun", "explosive", "detonator", "weapon"]):
+        scores["weapon_instruction"] = max(scores.get("weapon_instruction", 0), 0.75)
+    # Incite violence heuristics
+    if any(k in text_l for k in ["kill them", "kill all", "attack them", "exterminate", "wipe out", "genocide", "harm them"]):
+        scores["incite_violence"] = 0.85
+    # Depiction (usually allowed)
+    depiction_cues = [
+        "murder mystery",
+        "murder story",
+        "violent scene",
+        "crime thriller",
+        # creative writing intents
+        "write a ", "write an ", "draft a ", "compose a ",
+        "screenplay", "script", "novel", "short story", "poem", "fiction",
+        "plot", "outline", "synopsis",
+    ]
+    violence_terms = [
+        "murder", "kill", "violent", "violence", "gun", "weapon", "bomb", "shoot", "stab",
+    ]
+    if any(cue in text_l for cue in depiction_cues) and any(v in text_l for v in violence_terms):
+        scores["depict_violence"] = max(scores.get("depict_violence", 0), 0.7)
+    elif any(k in text_l for k in ["murder mystery", "murder story", "violent scene", "crime thriller"]):
+        scores["depict_violence"] = max(scores.get("depict_violence", 0), 0.6)
+    return scores
 
 
 def compute_risk(input_text: str, evidence_present: bool) -> tuple[int, list[str]]:
@@ -48,12 +86,17 @@ def compute_risk(input_text: str, evidence_present: bool) -> tuple[int, list[str
     inj_markers = detect_prompt_injection(input_text)
     sec_markers = detect_secret_like(input_text)
     pii_markers = detect_pii_like(input_text)
+    vio_markers = detect_violence_like(input_text)
+    intents = _local_intent_classifier(input_text)
 
     # Collect reasons (deduplicated)
     reasons: set[str] = set()
     reasons.update(f"prompt_injection:{m}" for m in inj_markers)
     reasons.update(f"secret_like:{m}" for m in sec_markers)
     reasons.update(f"pii_like:{m}" for m in pii_markers)
+    reasons.update(f"violence_like:{m}" for m in vio_markers)
+    for label, score in intents.items():
+        reasons.add(f"intent:{label}:{score:.2f}")
     # Promote DOB to a stronger PII-like marker if present
     if "date_of_birth" in pii_markers:
         reasons.add("pii_like:date_of_birth")
@@ -72,6 +115,28 @@ def compute_risk(input_text: str, evidence_present: bool) -> tuple[int, list[str
     # PII-like scoring
     if pii_markers:
         score += 30 + max(0, len(pii_markers) - 1) * 2
+    # Violence-like scoring influenced by intent
+    v_weapon = intents.get("weapon_instruction", 0) >= 0.5
+    v_incite = intents.get("incite_violence", 0) >= 0.5
+    v_depict = intents.get("depict_violence", 0) >= 0.5
+    if vio_markers:
+        if v_weapon or v_incite:
+            # Strong risk when instructing or inciting
+            score += 70 + max(0, len(vio_markers) - 1) * 5
+        elif v_depict:
+            # Creative/depiction context: minimal risk bump
+            score += 5
+        else:
+            # Ambiguous mentions: modest risk
+            score += 20
+    # Intent scoring (weapon/incite strongly)
+    if v_weapon:
+        score += 80
+    if v_incite:
+        score += 80
+    if v_depict:
+        # No extra beyond the small bump above to avoid double counting
+        score += 0
 
     # Synergy bonus if multiple categories are present
     categories_present = sum(
@@ -79,6 +144,7 @@ def compute_risk(input_text: str, evidence_present: bool) -> tuple[int, list[str
             1 if inj_markers else 0,
             1 if sec_markers else 0,
             1 if pii_markers else 0,
+            1 if vio_markers else 0,
         ]
     )
     if categories_present > 1:

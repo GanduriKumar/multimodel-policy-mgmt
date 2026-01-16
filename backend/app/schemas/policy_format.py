@@ -46,6 +46,18 @@ class PolicyDoc(BaseModel):
         description="Configuration dictionary for PII handling rules.",
     )
 
+    # Intent rules for local intent-based enforcement.
+    # Structure:
+    #   intent_rules: {
+    #       "deny": ["weapon_instruction", "incite_violence"],
+    #       "thresholds": { "weapon_instruction": 0.7, "incite_violence": 0.6 }
+    #   }
+    # If a detected intent label appears in 'deny' and its score >= threshold (default 0.5), the request is denied.
+    intent_rules: dict = Field(
+        default_factory=dict,
+        description="Intent-based policy: labels to deny and per-label thresholds. Keys: 'deny' (list[str]), 'thresholds' (dict[label->float]).",
+    )
+
     # Risk score threshold from 0 to 100
     risk_threshold: int = Field(
         ...,

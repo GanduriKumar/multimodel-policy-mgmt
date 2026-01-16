@@ -3,71 +3,36 @@ Shared API router.
 
 - Aggregates sub-routers from app.api.routes.* modules.
 - Uses no top-level prefix to avoid double-/api when sub-routers already define their own prefixes.
-- Safely attempts to include optional sub-routers if they exist.
+- Directly imports known routers so import errors are immediately visible.
 
-Sub-routers included (if present):
+Sub-routers included:
 - app.api.routes.protect   -> /api/protect
 - app.api.routes.evidence  -> /api/evidence
 - app.api.routes.audit     -> /api/audit
 - app.api.routes.policies  -> /api/policies
-- app.api.routes.traces    -> /api/traces
-- app.api.routes.protect_generate -> /api/protect-generate
+- app.api.routes.maintenance -> /api/admin
 """
 
 from __future__ import annotations
 
-import importlib
-from typing import List, Optional
-
 from fastapi import APIRouter
 
-__all__ = ["router", "INCLUDED_MODULES"]
+# Direct imports - any error will be visible at startup
+from app.api.routes.protect import router as protect_router
+from app.api.routes.policies import router as policies_router
+from app.api.routes.evidence import router as evidence_router
+from app.api.routes.audit import router as audit_router
+from app.api.routes.maintenance import router as maintenance_router
+
+__all__ = ["router"]
 
 # Create the top-level router without a prefix.
 # Each sub-router controls its own path under /api/...
 router = APIRouter()
 
-
-def _try_include_subrouter(parent: APIRouter, module_path: str) -> Optional[APIRouter]:
-    """
-    Attempt to import a module and include its 'router' (if present and is an APIRouter).
-    Returns the included router or None.
-    """
-    try:
-        module = importlib.import_module(module_path)
-    except ModuleNotFoundError:
-        return None
-    except Exception:
-        # Ignore any unexpected import error to avoid breaking the API wiring.
-        return None
-
-    sub = getattr(module, "router", None)
-    if isinstance(sub, APIRouter):
-        parent.include_router(sub)
-        return sub
-    return None
-
-
-def _include_known_subrouters(parent: APIRouter) -> List[str]:
-    """
-    Try to include known API sub-routers by conventional module names.
-    Returns a list of module paths that were successfully included.
-    """
-    candidates = [
-        "app.api.routes.protect",
-        "app.api.routes.evidence",
-        "app.api.routes.audit",
-        "app.api.routes.policies",
-        "app.api.routes.traces",
-        "app.api.routes.protect_generate",
-        "app.api.routes.maintenance",  # admin/reset-all
-    ]
-    included: List[str] = []
-    for mod in candidates:
-        if _try_include_subrouter(parent, mod) is not None:
-            included.append(mod)
-    return included
-
-
-# Best-effort: include any known sub-routers if present.
-INCLUDED_MODULES = _include_known_subrouters(router)
+# Include all known routers
+router.include_router(protect_router)
+router.include_router(policies_router)
+router.include_router(evidence_router)
+router.include_router(audit_router)
+router.include_router(maintenance_router)

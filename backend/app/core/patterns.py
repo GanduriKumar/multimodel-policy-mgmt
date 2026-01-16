@@ -16,7 +16,12 @@ from __future__ import annotations
 import re
 from typing import Iterable, List
 
-__all__ = ["detect_prompt_injection", "detect_secret_like", "detect_pii_like"]
+__all__ = [
+    "detect_prompt_injection",
+    "detect_secret_like",
+    "detect_pii_like",
+    "detect_violence_like",
+]
 
 
 # -------------------------------
@@ -185,3 +190,33 @@ def detect_pii_like(text: str) -> list[str]:
             break  # one valid card is enough to flag
 
     return sorted(reasons)
+
+
+# -------------------------------
+# Violence and Harm Detection
+# -------------------------------
+
+_VIOLENCE_PATTERNS: list[tuple[str, re.Pattern]] = [
+    ("kill", re.compile(r"\bkill(ing|ed|s)?\b", re.IGNORECASE)),
+    ("murder", re.compile(r"\bmurder(ing|ed|s|er|ers)?\b", re.IGNORECASE)),
+    ("bomb", re.compile(r"\bbomb(s|ing|ed)?\b", re.IGNORECASE)),
+    ("nuclear_bomb", re.compile(r"\bnuclear\s+(bomb|weapon)s?\b", re.IGNORECASE)),
+    ("attack", re.compile(r"\battack(s|ing|ed)?\b", re.IGNORECASE)),
+    ("shoot", re.compile(r"\bshoot(ing|s|er|ers)?\b", re.IGNORECASE)),
+    ("stab", re.compile(r"\bstab(s|bing|bed)?\b", re.IGNORECASE)),
+    ("genocide", re.compile(r"\bgenocide\b", re.IGNORECASE)),
+    ("exterminate", re.compile(r"\bexterminat(e|es|ing|ed|ion)?\b", re.IGNORECASE)),
+    ("harm", re.compile(r"\bharm(s|ing|ed|ful)?\b", re.IGNORECASE)),
+    ("terrorism", re.compile(r"\bterroris(m|t|ts)\b", re.IGNORECASE)),
+]
+
+
+def detect_violence_like(text: str) -> list[str]:
+    """
+    Detect words and phrases that indicate violence, harm, or dangerous intent.
+
+    Returns a list of reason markers for any matches.
+    """
+    if not isinstance(text, str):
+        raise TypeError("text must be a str")
+    return _search_patterns(text, _VIOLENCE_PATTERNS)
