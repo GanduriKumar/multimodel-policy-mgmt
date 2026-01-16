@@ -64,16 +64,8 @@ const Home: React.FC = () => {
       <section className="mb-4">
         <h5 className="mb-3">Explore Policies</h5>
         <form onSubmit={onLoad} className="row g-3 align-items-end">
-          <div className="col-sm-3">
-            <label htmlFor="tenantId" className="form-label">Tenant ID</label>
-            <input
-              id="tenantId"
-              type="number"
-              min={1}
-              className="form-control"
-              value={tenantId}
-              onChange={(e) => setTenantId(Number(e.target.value))}
-            />
+          <div className="col-sm-3 d-none">
+            <input id="tenantId" type="hidden" value={tenantId} readOnly />
           </div>
           <div className="col-sm-3">
             <button type="submit" className="btn btn-success" disabled={loading}>

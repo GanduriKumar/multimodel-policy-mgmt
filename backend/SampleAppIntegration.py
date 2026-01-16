@@ -128,7 +128,7 @@ def call_openai_chat(*, api_key: str, model: str, prompt: str) -> str:
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Bidirectional policy-guarded GenAI app (Python).")
-    p.add_argument("--tenant-id", type=int, required=True, help="Tenant identifier used by backend policies.")
+    p.add_argument("--tenant-id", type=int, required=False, default=1, help="Tenant identifier (default 1 for on-prem).")
     p.add_argument("--policy-id", type=int, required=True, help="Numeric policy id to enforce.")
     p.add_argument("--prompt", type=str, default=None, help="Prompt text; if omitted, read from STDIN.")
     p.add_argument("--evidence-types", type=str, default="", help="Comma-separated evidence types (e.g., url,document).")

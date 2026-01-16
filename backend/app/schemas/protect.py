@@ -16,7 +16,7 @@ __all__ = ["ProtectRequest", "ProtectResponse"]
 
 
 class ProtectRequest(BaseModel):
-    tenant_id: int = Field(..., ge=1, description="Tenant identifier")
+    tenant_id: int = Field(1, ge=1, description="Tenant identifier (defaults to 1 for single-tenant on-prem)")
     policy_id: int = Field(..., ge=1, description="Policy identifier within the tenant")
     input_text: str = Field(..., min_length=1, description="Input text to evaluate")
     # Using Optional[Set[str]] to align with DecisionService and policy engine callsites

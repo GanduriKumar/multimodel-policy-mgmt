@@ -5,7 +5,7 @@ const Protect: React.FC = () => {
   const { protect, loading, error, data } = useProtect();
 
   // Basic form state
-  const [tenantId, setTenantId] = useState<number>(1);
+  const [tenantId] = useState<number>(1);
   const [policyId, setPolicyId] = useState<number>(1);
   const [inputText, setInputText] = useState<string>('');
   const [evidenceTypesCsv, setEvidenceTypesCsv] = useState<string>('');
@@ -98,20 +98,7 @@ const Protect: React.FC = () => {
 
       <form onSubmit={onSubmit} className="mb-4">
         <div className="row g-3">
-          <div className="col-sm-3">
-            <label htmlFor="tenantId" className="form-label">
-              Tenant ID
-            </label>
-            <input
-              id="tenantId"
-              type="number"
-              min={1}
-              className="form-control"
-              value={tenantId}
-              onChange={(e) => setTenantId(Number(e.target.value))}
-              required
-            />
-          </div>
+          <input type="hidden" id="tenantId" value={tenantId} readOnly />
           <div className="col-sm-5">
             <label htmlFor="policyId" className="form-label">
               Policy ID

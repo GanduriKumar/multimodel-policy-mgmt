@@ -36,7 +36,7 @@ function getApiBase(): string {
 
 // In development, backend allows missing API key; omit header to avoid 401s.
 
-const TENANT_ID = '1';
+const TENANT_ID = '1'; // hidden in UI; defaulted to 1 for on-prem
 const TZ = 'Asia/Kolkata';
 
 const Dashboard: React.FC = () => {
@@ -336,7 +336,7 @@ const Dashboard: React.FC = () => {
     <div className="container py-4 dashboard">
       <div className="d-flex align-items-center justify-content-between mb-3">
         <h1 className="mb-0">Dashboard</h1>
-        <span className="badge bg-secondary">Tenant {TENANT_ID} • {TZ}</span>
+        <span className="badge bg-secondary">Timezone: {TZ}</span>
       </div>
 
       {error && <div className="alert alert-danger" role="alert">{error}</div>}
@@ -436,7 +436,7 @@ const Dashboard: React.FC = () => {
                       </button>
                     </div>
                   </div>
-                  <p className="text-muted small mt-2 mb-0">Timezone: {TZ}. Tenant: {TENANT_ID}.</p>
+                  <p className="text-muted small mt-2 mb-0">Timezone: {TZ}.</p>
                 </div>
               </div>
             </div>
@@ -484,7 +484,7 @@ const Dashboard: React.FC = () => {
                       </button>
                     </div>
                   </div>
-                  <p className="text-muted small mt-2 mb-0">Timezone: {TZ}. Tenant: {TENANT_ID}.</p>
+                  <p className="text-muted small mt-2 mb-0">Timezone: {TZ}.</p>
                 </div>
               </div>
             </div>

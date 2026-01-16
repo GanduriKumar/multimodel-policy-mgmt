@@ -4,8 +4,7 @@ import usePolicies, { type PolicyOut, type PolicyVersionOut, type CreatePolicyPa
 const Policies: React.FC = () => {
   const { items, total, loading, error, listPolicies, createPolicy, addVersion, activateVersion, getActiveVersion, listVersions, deletePolicy, resetError } = usePolicies();
 
-  // Tenant selector
-  const [tenantId, setTenantId] = useState<number>(1);
+  // Single-tenant mode: tenant is fixed to 1 (hidden in UI)
 
   // Create policy form
   const [name, setName] = useState<string>('');
@@ -169,10 +168,10 @@ const Policies: React.FC = () => {
 
   // Auto-load policies when page mounts or tenant changes
   useEffect(() => {
-    // best-effort load
-    listPolicies(tenantId, { offset: 0, limit: 50 }).catch(() => {/* handled by hook */});
+    // Always use default tenant 1 (hidden)
+    listPolicies(1, { offset: 0, limit: 50 }).catch(() => {/* handled by hook */});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId]);
+  }, []);
 
   // For each listed policy, fetch its currently active version if unknown
   useEffect(() => {
@@ -195,7 +194,7 @@ const Policies: React.FC = () => {
   const onLoad = async (e: React.FormEvent) => {
     e.preventDefault();
     resetError();
-    await listPolicies(tenantId, { offset: 0, limit: 50 });
+    await listPolicies(1, { offset: 0, limit: 50 });
   };
 
   const onCreatePolicy = async (e: React.FormEvent) => {
@@ -204,7 +203,7 @@ const Policies: React.FC = () => {
     setCreating(true);
     try {
       const payload: CreatePolicyPayload = {
-        tenant_id: tenantId,
+        tenant_id: 1,
         name: name.trim(),
         slug: slug.trim(),
         description: description.trim() || null,
@@ -316,20 +315,9 @@ const Policies: React.FC = () => {
         <a className="btn btn-outline-secondary" href="/">Home</a>
       </div>
 
-      {/* Tenant & load */}
+      {/* Load policies (tenant hidden) */}
       <section className="mb-4">
         <form onSubmit={onLoad} className="row g-3 align-items-end">
-          <div className="col-sm-3">
-            <label htmlFor="tenantId" className="form-label">Tenant ID</label>
-            <input
-              id="tenantId"
-              type="number"
-              min={1}
-              className="form-control"
-              value={tenantId}
-              onChange={(e) => setTenantId(Number(e.target.value))}
-            />
-          </div>
           <div className="col-sm-3">
             <button type="submit" className="btn btn-primary" disabled={loading}>
               {loading ? 'Loading…' : 'Load Policies'}
@@ -500,7 +488,7 @@ const Policies: React.FC = () => {
           <small className="text-muted">Total: {total}</small>
         </div>
         {items.length === 0 ? (
-          <div className="text-muted">No policies loaded. Use "Load Policies" to fetch for the selected tenant.</div>
+          <div className="text-muted">No policies loaded. Use "Load Policies" to fetch.</div>
         ) : (
           <div className="table-responsive">
             <table className="table table-sm align-middle">

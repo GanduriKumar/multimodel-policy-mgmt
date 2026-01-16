@@ -10,7 +10,7 @@ const AuditPage: React.FC = () => {
   const [policyVersionInfo, setPolicyVersionInfo] = useState<{ id: number; version: number } | null>(null);
 
   // List controls
-  const [tenantId, setTenantId] = useState<number>(1);
+  const [tenantId] = useState<number>(1);
   const [offset, setOffset] = useState<number>(0);
   const [limit, setLimit] = useState<number>(20);
 
@@ -91,10 +91,7 @@ const AuditPage: React.FC = () => {
 
       <section className="mb-4">
         <form onSubmit={onLoad} className="row g-3 align-items-end">
-          <div className="col-sm-3">
-            <label htmlFor="tenantId" className="form-label">Tenant ID</label>
-            <input id="tenantId" type="number" min={1} className="form-control" value={tenantId} onChange={(e) => setTenantId(Number(e.target.value))} />
-          </div>
+          <input id="tenantId" type="hidden" value={tenantId} readOnly />
           <div className="col-sm-2">
             <label htmlFor="offset" className="form-label">Offset</label>
             <input id="offset" type="number" min={0} className="form-control" value={offset} onChange={(e) => setOffset(Number(e.target.value))} />
