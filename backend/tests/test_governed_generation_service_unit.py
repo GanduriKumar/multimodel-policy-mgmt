@@ -20,7 +20,8 @@ class FakeDecisionService:
         *,
         tenant_id: int,
         input_text: str,
-        policy_slug: str,
+        policy_id: Optional[int] = None,
+        policy_slug: Optional[str] = None,
         evidence_types: Optional[set[str]] = None,
         request_id: Optional[str] = None,
         user_agent: Optional[str] = None,
@@ -29,6 +30,7 @@ class FakeDecisionService:
     ) -> Dict[str, Any]:
         self.calls.append({
             "tenant_id": tenant_id,
+            "policy_id": policy_id,
             "policy_slug": policy_slug,
             "input_text": input_text,
         })

@@ -48,6 +48,53 @@ def db_engine(tmp_path_factory) -> "Generator":
     import_all_models()
     Base.metadata.create_all(bind=engine)
 
+    # Backfill / ensure newer columns exist on freshly created test DBs.
+    # Some local/legacy test DB schemas may be missing the `reasoning_chain` JSON
+    # column on `decision_log`. Make this idempotent and best-effort so tests can
+    # run without requiring manual migrations in CI/local runs.
+    try:
+        from sqlalchemy import inspect, text  # type: ignore
+
+        inspector = inspect(engine)
+        if "decision_log" in inspector.get_table_names():
+            cols = [c["name"] for c in inspector.get_columns("decision_log")]
+            if "reasoning_chain" not in cols:
+                with engine.begin() as conn:
+                    try:
+                        conn.execute(text('ALTER TABLE decision_log ADD COLUMN reasoning_chain JSON'))
+                    except Exception:
+                        # best-effort: some SQLite builds may not accept JSON type; try TEXT
+                        try:
+                            conn.execute(text('ALTER TABLE decision_log ADD COLUMN reasoning_chain TEXT'))
+                        except Exception:
+                            pass
+    except Exception:
+        # If introspection or ALTER fails for any reason, continue; tests may still
+        # exercise code paths that don't require the column, but many tests expect it.
+        pass
+    # Ensure there's a default tenant with id=1 for tests that reference tenant_id=1.
+    # This is idempotent and uses INSERT OR IGNORE so it won't conflict with other test setup.
+    try:
+        from sqlalchemy import text as _text  # type: ignore
+
+        with engine.begin() as conn:
+            # Use a recognizable test tenant; specify slug and api_key_hash to satisfy constraints
+            conn.execute(
+                _text(
+                    "INSERT OR IGNORE INTO tenant (id, name, slug, api_key_hash, is_active) VALUES (:id, :name, :slug, :api_key_hash, :is_active)"
+                ),
+                {
+                    "id": 1,
+                    "name": "Test Tenant",
+                    "slug": "test-tenant",
+                    "api_key_hash": "0" * 64,
+                    "is_active": 1,
+                },
+            )
+    except Exception:
+        # best-effort; if insertion fails, tests that need tenant_id=1 will still fail and reveal next steps
+        pass
+
     try:
         yield engine
     finally:
@@ -96,6 +143,29 @@ def db_session(db_engine) -> "Generator":
     except Exception:
         session.rollback()
         raise
+
+    # After truncation insert a default tenant row for tests that reference tenant_id=1
+    try:
+        from sqlalchemy import text as _text  # type: ignore
+
+        session.execute(
+            _text(
+                "INSERT OR IGNORE INTO tenant (id, name, slug, api_key_hash, is_active) VALUES (:id, :name, :slug, :api_key_hash, :is_active)"
+            ),
+            {
+                "id": 1,
+                "name": "Test Tenant",
+                "slug": "test-tenant",
+                "api_key_hash": "0" * 64,
+                "is_active": 1,
+            },
+        )
+        session.commit()
+    except Exception:
+        try:
+            session.rollback()
+        except Exception:
+            pass
 
     try:
         yield session

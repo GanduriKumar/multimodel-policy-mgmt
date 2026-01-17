@@ -7,7 +7,8 @@ from typing import List, Optional, Iterable, Dict, Any
 import uuid
 
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, text
+import sqlalchemy
 from sqlalchemy.orm import Session
 
 from app.models.decision_log import DecisionLog
@@ -146,16 +147,41 @@ def list_decision_events(
         to_utc = to_utc.astimezone(timezone.utc)
 
     # Prefetch decisions in window for tenant
-    decs = (
-        session.execute(
-            select(DecisionLog, RequestLog, Policy, PolicyVersion)
-            .join(RequestLog, DecisionLog.request_log_id == RequestLog.id)
-            .outerjoin(Policy, DecisionLog.policy_id == Policy.id)
-            .outerjoin(PolicyVersion, DecisionLog.policy_version_id == PolicyVersion.id)
-            .where(DecisionLog.tenant_id == tenant_id)
+    try:
+        decs = (
+            session.execute(
+                select(DecisionLog, RequestLog, Policy, PolicyVersion)
+                .join(RequestLog, DecisionLog.request_log_id == RequestLog.id)
+                .outerjoin(Policy, DecisionLog.policy_id == Policy.id)
+                .outerjoin(PolicyVersion, DecisionLog.policy_version_id == PolicyVersion.id)
+                .where(DecisionLog.tenant_id == tenant_id)
+            )
+            .all()
         )
-        .all()
-    )
+    except sqlalchemy.exc.OperationalError as e:
+        # Handle legacy databases that don't have the enhanced column `reasoning_chain`.
+        msg = str(e).lower()
+        if "reasoning_chain" in msg or "no such column: decision_log.reasoning_chain" in msg:
+            # Add the missing column (SQLite supports ALTER TABLE ADD COLUMN)
+            conn = session.get_bind()
+            try:
+                conn.execute(text('ALTER TABLE decision_log ADD COLUMN reasoning_chain JSON'))
+            except Exception:
+                # If we can't alter the table here, re-raise the original error to surface it.
+                raise
+            # Retry the original select after schema alteration
+            decs = (
+                session.execute(
+                    select(DecisionLog, RequestLog, Policy, PolicyVersion)
+                    .join(RequestLog, DecisionLog.request_log_id == RequestLog.id)
+                    .outerjoin(Policy, DecisionLog.policy_id == Policy.id)
+                    .outerjoin(PolicyVersion, DecisionLog.policy_version_id == PolicyVersion.id)
+                    .where(DecisionLog.tenant_id == tenant_id)
+                )
+                .all()
+            )
+        else:
+            raise
 
     events: list[DecisionEvent] = []
 

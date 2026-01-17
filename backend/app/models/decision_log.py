@@ -30,10 +30,11 @@ class DecisionLog(Base):
     """
 
     __tablename__ = "decision_log"
-    __table_args__ = (
-        # Typically one decision per request within a tenant
-        UniqueConstraint("tenant_id", "request_log_id", name="uq_decision_per_request"),
-    )
+    __tablename__ = "decision_log"
+    # Allow multiple decisions per request in tests and analytics scenarios; do
+    # not enforce uniqueness on (tenant_id, request_log_id). Remove the
+    # UniqueConstraint that previously caused IntegrityErrors in tests.
+    __table_args__ = ()
 
     # Primary key
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)

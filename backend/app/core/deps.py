@@ -103,18 +103,23 @@ class DecisionService:
         *,
         tenant_id: int,
         input_text: str,
-        policy_id: int,
+        policy_id: Optional[int] = None,
+        policy_slug: Optional[str] = None,
         evidence_types: Optional[Set[str]] = None,
         request_id: Optional[str] = None,
         user_agent: Optional[str] = None,
         client_ip: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> ProtectResult:
-        """Delegate to the module-level protect function with bound repositories."""
+        """Delegate to the module-level protect function with bound repositories.
+
+        Accepts either a policy_id or a policy_slug for flexibility across callers.
+        """
         return protect(
             tenant_id=tenant_id,
             input_text=input_text,
             policy_id=policy_id,
+            policy_slug=policy_slug,
             evidence_types=evidence_types,
             policy_repo=self.policy_repo,
             evidence_repo=self.evidence_repo,

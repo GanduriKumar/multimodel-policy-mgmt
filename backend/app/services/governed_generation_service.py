@@ -73,6 +73,7 @@ class GovernedGenerationService:
             tenant_id=request.tenant_id,
             input_text=request.input_text,
             policy_id=getattr(request, "policy_id", None),
+            policy_slug=getattr(request, "policy_slug", None),
             evidence_types=request.evidence_types,
             request_id=request.request_id,
             user_agent=None,

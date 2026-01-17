@@ -27,6 +27,7 @@ from app.schemas.policies import (
     PolicyVersionListResponse,
     PolicyUpdate,
 )
+from app.schemas.policy_format import PolicyDoc
 
 router = APIRouter(prefix="/api/policies", tags=["policies"])
 
@@ -51,6 +52,26 @@ def _to_model(model_cls: Type[T], obj: Any) -> T:
     if hasattr(obj, "__dict__"):
         return model_cls(**obj.__dict__)  # type: ignore[misc]
     raise TypeError("Unsupported model conversion")
+
+
+def _normalize_policy_document(doc: dict) -> dict:
+    """
+    Return a normalized policy document including default compliance fields.
+
+    This ensures clients see the full PolicyDoc schema even if older versions
+    stored only minimal keys.
+    """
+    try:
+        if not isinstance(doc, dict):
+            doc = {}
+        model = PolicyDoc(**doc)
+        # Prefer Pydantic v2 model_dump; fallback to dict for v1
+        if hasattr(model, "model_dump"):
+            return model.model_dump()
+        return model.dict()  # type: ignore[attr-defined]
+    except Exception:
+        # If normalization fails, return the original payload
+        return doc if isinstance(doc, dict) else {}
 
 
 @router.post("", response_model=PolicyOut, status_code=status.HTTP_201_CREATED)
@@ -116,6 +137,11 @@ def add_policy_version(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
+    # Normalize the document for output (storage remains as provided)
+    try:
+        version.document = _normalize_policy_document(getattr(version, "document", {}))  # type: ignore[attr-defined]
+    except Exception:
+        pass
     return _to_model(PolicyVersionOut, version)
 
 
@@ -163,6 +189,11 @@ def get_active_policy_version(
         # Return 204 No Content to indicate absence without surfacing an error
         # Client may treat undefined as "no active version"
         return Response(status_code=status.HTTP_204_NO_CONTENT)  # type: ignore[return-value]
+    # Normalize the document for output
+    try:
+        pv.document = _normalize_policy_document(getattr(pv, "document", {}))  # type: ignore[attr-defined]
+    except Exception:
+        pass
     return _to_model(PolicyVersionOut, pv)
 
 
@@ -177,6 +208,12 @@ def list_policy_versions(
     List versions for a policy (newest first).
     """
     items = repo.list_versions(policy_id=policy_id, offset=offset, limit=limit)
+    # Normalize documents for output
+    for v in items:
+        try:
+            v.document = _normalize_policy_document(getattr(v, "document", {}))  # type: ignore[attr-defined]
+        except Exception:
+            pass
     items_out = [_to_model(PolicyVersionOut, v) for v in items]
     return PolicyVersionListResponse(items=items_out, total=len(items_out))
 

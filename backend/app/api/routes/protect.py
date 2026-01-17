@@ -39,21 +39,41 @@ def protect_endpoint(
         if t_repo.get_by_id(payload.tenant_id) is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tenant not found")
 
-        # Validate policy exists
+        # Resolve policy ID from slug if needed (if repository supports it). Otherwise, allow slug-only
         p_repo = SqlAlchemyPolicyRepo(db)
-        pol = getattr(p_repo, "get_policy_by_id")(int(payload.policy_id))
-        if pol is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Policy not found")
+        policy_id = payload.policy_id
+        if policy_id is None and payload.policy_slug:
+            try:
+                if hasattr(p_repo, "get_policy_by_slug"):
+                    pol = getattr(p_repo, "get_policy_by_slug")(payload.tenant_id, payload.policy_slug)  # type: ignore[attr-defined]
+                    if pol is None:
+                        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Policy not found with slug: {payload.policy_slug}")
+                    policy_id = pol.id
+                else:
+                    # Repository does not support slug lookup; defer resolution to DecisionService
+                    policy_id = None
+            except Exception:
+                # Defer resolution to DecisionService which can handle slug via PolicyRepo protocol where available
+                policy_id = None
+        elif policy_id is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Either policy_id or policy_slug must be provided")
+        
+        # Validate policy exists
+        if policy_id is not None:
+            pol = getattr(p_repo, "get_policy_by_id")(int(policy_id))
+            if pol is None:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Policy not found")
         # Resolve active policy version (for linking evidence context when auto-capturing)
         pv = None
         pv_id = None
-        try:
-            if hasattr(p_repo, "get_active_version"):
-                pv = getattr(p_repo, "get_active_version")(int(payload.policy_id))  # type: ignore[attr-defined]
-                pv_id = getattr(pv, "id", None)
-        except Exception:
-            pv = None
-            pv_id = None
+        if policy_id is not None:
+            try:
+                if hasattr(p_repo, "get_active_version"):
+                    pv = getattr(p_repo, "get_active_version")(int(policy_id))  # type: ignore[attr-defined]
+                    pv_id = getattr(pv, "id", None)
+            except Exception:
+                pv = None
+                pv_id = None
 
         # Normalize evidence_types to a clean set[str], accepting string CSV or list
         ev = None
@@ -95,14 +115,14 @@ def protect_endpoint(
                             ev.add(et.strip())
                         valid_ids.append(int(eid))
             # If no valid IDs were provided, auto-capture the input as an evidence item for audit
-            if not valid_ids:
+            if not valid_ids and policy_id is not None:
                 try:
                     created = e_repo.create_evidence(
                         tenant_id=payload.tenant_id,
                         evidence_type="document",
                         content_text=payload.input_text,
                         description="Captured request content",
-                        policy_id=int(payload.policy_id),
+                        policy_id=int(policy_id),
                         policy_version_id=(int(pv_id) if pv_id else None),
                     )
                     valid_ids = [int(getattr(created, "id"))]
@@ -126,7 +146,8 @@ def protect_endpoint(
         result = service.protect(
             tenant_id=payload.tenant_id,
             input_text=payload.input_text,
-            policy_id=payload.policy_id,
+            policy_id=policy_id,
+            policy_slug=payload.policy_slug,
             evidence_types=ev,
             request_id=payload.request_id,
             user_agent=payload.user_agent,

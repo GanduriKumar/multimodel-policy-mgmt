@@ -61,13 +61,13 @@ def _find_blocked_terms(text: str, blocked_terms: Iterable[str]) -> list[str]:
         if skip_depiction_terms and low in violence_terms:
             continue
         if low in t:
-            reasons.append(f"blocked_term:{term_norm}")
+            reasons.append(f"blocked_term:{low}")
             continue
         # Word boundary check to catch standalone prohibited words
         try:
             import re
             if re.search(rf"\b{re.escape(low)}\b", t):
-                reasons.append(f"blocked_term:{term_norm}")
+                reasons.append(f"blocked_term:{low}")
         except Exception:
             # If regex fails for any reason, fall back to substring logic handled above
             pass
@@ -78,14 +78,23 @@ def _find_missing_evidence(
     provided: Set[str], required: Iterable[str]
 ) -> list[str]:
     """
-    Generic evidence check: if policy specifies any required evidence types,
-    treat presence of any evidence as sufficient. No per-type matching.
+    Check if all required evidence types are provided.
+    Returns specific missing_evidence:<type> reasons for each missing type.
     """
+    reasons = []
     req_list = [(req or "").strip() for req in required if (req or "").strip()]
     if not req_list:
         return []
-    has_any = any(isinstance(e, str) and e.strip() for e in provided)
-    return [] if has_any else ["missing_evidence:any"]
+    
+    # Check each required type individually
+    provided_lower = {(p or "").strip().lower() for p in provided if (p or "").strip()}
+    
+    for req_type in req_list:
+        req_lower = req_type.lower()
+        if req_lower not in provided_lower:
+            reasons.append(f"missing_evidence:{req_type}")
+    
+    return reasons
 
 
 def _apply_pii_rules(text: str, pii_rules: dict) -> list[str]:

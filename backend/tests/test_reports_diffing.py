@@ -16,7 +16,7 @@ def test_blocked_terms_case_insensitive():
     s, d = diff_policy_docs(o, n)
     bt = d["modified"]["blocked_terms"]
     assert set(bt["added"]) == {"stab"}
-    assert set(bt["removed"]) == {"Kill"}
+    assert set(bt["removed"]) == {"murder"}  # "Kill" and "kill" are the same case-insensitively, so "murder" is removed
 
 
 def test_intent_rules_deny_and_thresholds():

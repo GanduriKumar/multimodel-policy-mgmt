@@ -92,7 +92,8 @@ def protect(
     *,
     tenant_id: int,
     input_text: str,
-    policy_id: int,
+    policy_id: Optional[int] = None,
+    policy_slug: Optional[str] = None,
     evidence_types: Optional[Set[str]],
     policy_repo: PolicyRepo,
     evidence_repo: EvidenceRepo,  # kept for future use; Protocol-only dependency
@@ -108,7 +109,8 @@ def protect(
     Args:
         tenant_id: Tenant identifier.
         input_text: The content to analyze.
-        policy_slug: Policy slug within the tenant.
+        policy_id: Policy ID within the tenant (required if policy_slug not provided).
+        policy_slug: Policy slug within the tenant (alternative to policy_id).
         evidence_types: Set of provided evidence type strings (e.g., {"url", "document"}).
         policy_repo: Policy repository (Protocol).
         evidence_repo: Evidence repository (Protocol) - not used directly in MVP.
@@ -123,7 +125,23 @@ def protect(
     """
     if not isinstance(input_text, str):
         raise TypeError("input_text must be a str")
-    if not isinstance(policy_id, int) or policy_id < 1:
+    
+    # Resolve policy by slug or ID
+    if policy_slug:
+        if policy_id:
+            raise ValueError("Provide either policy_id or policy_slug, not both")
+        # We need to look up the policy by slug to get its ID
+        # For now, we'll use the policy_repo to get the active policy by slug
+        pol = policy_repo.get_policy_by_slug(tenant_id, policy_slug)
+        if not pol:
+            raise ValueError(f"Policy not found with slug: {policy_slug}")
+        actual_policy_id = pol.id
+    elif policy_id:
+        actual_policy_id = policy_id
+    else:
+        raise ValueError("Either policy_id or policy_slug must be provided")
+    
+    if not isinstance(actual_policy_id, int) or actual_policy_id < 1:
         raise ValueError("policy_id must be a positive integer")
 
     ev_types: Set[str] = set(evidence_types or set())
@@ -142,8 +160,8 @@ def protect(
     )
 
     # 2) Load active policy document
-    policy_doc_dict, policy_id, policy_version_id = _load_active_policy_doc(
-        policy_repo=policy_repo, tenant_id=tenant_id, policy_id=policy_id
+    policy_doc_dict, resolved_policy_id, policy_version_id = _load_active_policy_doc(
+        policy_repo=policy_repo, tenant_id=tenant_id, policy_id=actual_policy_id
     )
 
     # Default policy if none exists: permissive with high threshold
@@ -203,7 +221,7 @@ def protect(
         request_log_id= getattr(request_log, "id", None),
         allowed=allowed,
         reasons=reasons,
-        policy_id=policy_id,
+        policy_id=resolved_policy_id,
         policy_version_id=policy_version_id,
         risk_score=risk_score,
     )

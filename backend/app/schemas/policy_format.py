@@ -11,28 +11,45 @@ Fields:
 
 from __future__ import annotations
 
+from typing import Optional
 from pydantic import BaseModel, Field
 
 __all__ = ["PolicyDoc"]
 
 
 class PolicyDoc(BaseModel):
+    # Metadata fields
+    id: Optional[int] = Field(
+        default=None,
+        description="Policy ID (optional, for reporting/tracking)",
+    )
+    
+    name: Optional[str] = Field(
+        default=None,
+        description="Policy name (optional, for reporting/tracking)",
+    )
+    
+    version: Optional[int] = Field(
+        default=None,
+        description="Policy version (optional, for reporting/tracking)",
+    )
+    
     # List of terms that are blocked outright
     blocked_terms: list[str] = Field(
-        ...,
+        default_factory=list,
         description="List of terms that should be blocked.",
     )
 
     # List of allowed/approved sources (e.g., domains or identifiers)
     allowed_sources: list[str] = Field(
-        ...,
+        default_factory=list,
         description="Whitelisted sources (domains, identifiers, etc.).",
     )
 
     # Evidence configuration
     # required_evidence_types retained for backward compatibility but is presence-only in engine
     required_evidence_types: list[str] = Field(
-        ...,
+        default_factory=list,
         description="Deprecated granular types; engine treats any source as satisfying evidence.",
     )
     require_any_evidence: bool = Field(
@@ -42,7 +59,7 @@ class PolicyDoc(BaseModel):
 
     # Configuration dict for PII handling (e.g., {'mask_emails': True, 'allow_phone': False})
     pii_rules: dict = Field(
-        ...,
+        default_factory=dict,
         description="Configuration dictionary for PII handling rules.",
     )
 
@@ -59,11 +76,23 @@ class PolicyDoc(BaseModel):
     )
 
     # Risk score threshold from 0 to 100
-    risk_threshold: int = Field(
-        ...,
+    risk_threshold: int | float = Field(
+        default=50,
         ge=0,
         le=100,
         description="Risk score threshold (0-100) beyond which content is blocked or escalated.",
+    )
+    
+    # Rules list (for compliance frameworks)
+    rules: list[str] = Field(
+        default_factory=list,
+        description="List of policy rules (for compliance reporting)",
+    )
+    
+    # Outputs configuration (for compliance frameworks)
+    outputs: dict = Field(
+        default_factory=dict,
+        description="Outputs configuration (for compliance reporting)",
     )
 
     # Conservative mode: if True, any risk indicators (prompt injection, PII-like, secret-like, etc.)

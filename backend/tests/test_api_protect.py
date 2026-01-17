@@ -20,7 +20,8 @@ class _FakeDecisionService:
         *,
         tenant_id: int,
         input_text: str,
-        policy_slug: str,
+        policy_id=None,
+        policy_slug=None,
         evidence_types=None,
         request_id=None,
         user_agent=None,
@@ -38,9 +39,9 @@ class _FakeDecisionService:
 
 
 def test_api_protect_with_dependency_override():
-    # Build a minimal app and include the protect router under /api
+    # Build a minimal app and include the protect router (already has /api prefix)
     app = FastAPI()
-    app.include_router(protect_router, prefix="/api")
+    app.include_router(protect_router)
 
     # Override the dependency used by the route to inject our fake service
     app.dependency_overrides[get_decision_service] = lambda: _FakeDecisionService()
@@ -59,6 +60,8 @@ def test_api_protect_with_dependency_override():
     }
 
     resp = client.post("/api/protect", json=payload)
+    if resp.status_code != 200:
+        print(f"Error response: {resp.text}")
     assert resp.status_code == 200
 
     data = resp.json()

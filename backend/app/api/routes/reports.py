@@ -18,6 +18,9 @@ from app.services.reports.decisions import list_decision_events
 from app.services.reports.decisions_renderers import to_csv as dec_to_csv, to_ndjson as dec_to_ndjson, to_json_array as dec_to_json
 from app.services.reports.html_renderer import render_policy_changes_html
 from app.services.reports.decisions_html_renderer import render_decisions_html
+from app.services.eu_ai_act_reporter import EUAIActReporter
+from app.services.nist_ai_rmf_reporter import NISTAIRMFReporter
+from app.services.nist_privacy_reporter import NISTPrivacyReporter
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
@@ -178,3 +181,156 @@ def decisions_report(
         pass
     headers = {"Content-Disposition": f"attachment; filename={safe_base}.html"}
     return Response(content=html_doc, media_type="text/html; charset=utf-8", headers=headers)
+
+
+@router.get("/compliance/eu-ai-act/{policy_id}")
+def eu_ai_act_compliance_report(
+    *,
+    policy_id: int,
+    tenant_id: int = Query(..., ge=1),
+    from_: Optional[str] = Query(None, alias="from"),
+    to: Optional[str] = Query(None),
+    format: str = Query("json"),
+    db: Session = Depends(get_db),
+    api_key=Depends(get_api_key),
+):
+    """Generate EU AI Act compliance report for a specific policy."""
+    # Get policy repository
+    from app.core.deps import get_policy_repo
+    policy_repo = next(get_policy_repo(db))
+    
+    # Fetch policy
+    policy_doc = policy_repo.get_policy(tenant_id=tenant_id, policy_id=policy_id)
+    if not policy_doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Policy not found")
+    
+    # Parse date range if provided
+    from_date = None
+    to_date = None
+    if from_:
+        try:
+            from_date = datetime.fromisoformat(from_.replace('Z', '+00:00'))
+        except:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid from date format")
+    if to:
+        try:
+            to_date = datetime.fromisoformat(to.replace('Z', '+00:00'))
+        except:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid to date format")
+    
+    # Generate report
+    reporter = EUAIActReporter(db)
+    report = reporter.generate_report(policy_doc, tenant_id, from_date, to_date)
+    
+    fmt = (format or "json").lower()
+    
+    if fmt == "json":
+        import json
+        body = json.dumps(reporter.export_to_dict(report), indent=2).encode('utf-8')
+        safe_base = f"eu-ai-act_p{policy_id}_{report.generated_at.replace(':', '-').split('.')[0]}"
+        headers = {"Content-Disposition": f"attachment; filename={safe_base}.json"}
+        return Response(content=body, media_type="application/json; charset=utf-8", headers=headers)
+    
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported format")
+
+
+@router.get("/compliance/nist-ai-rmf/{policy_id}")
+def nist_ai_rmf_compliance_report(
+    *,
+    policy_id: int,
+    tenant_id: int = Query(..., ge=1),
+    from_: Optional[str] = Query(None, alias="from"),
+    to: Optional[str] = Query(None),
+    format: str = Query("json"),
+    db: Session = Depends(get_db),
+    api_key=Depends(get_api_key),
+):
+    """Generate NIST AI RMF compliance report for a specific policy."""
+    # Get policy repository
+    from app.core.deps import get_policy_repo
+    policy_repo = next(get_policy_repo(db))
+    
+    # Fetch policy
+    policy_doc = policy_repo.get_policy(tenant_id=tenant_id, policy_id=policy_id)
+    if not policy_doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Policy not found")
+    
+    # Parse date range if provided
+    from_date = None
+    to_date = None
+    if from_:
+        try:
+            from_date = datetime.fromisoformat(from_.replace('Z', '+00:00'))
+        except:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid from date format")
+    if to:
+        try:
+            to_date = datetime.fromisoformat(to.replace('Z', '+00:00'))
+        except:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid to date format")
+    
+    # Generate report
+    reporter = NISTAIRMFReporter(db)
+    report = reporter.generate_report(policy_doc, tenant_id, from_date, to_date)
+    
+    fmt = (format or "json").lower()
+    
+    if fmt == "json":
+        import json
+        body = json.dumps(reporter.export_to_dict(report), indent=2).encode('utf-8')
+        safe_base = f"nist-ai-rmf_p{policy_id}_{report.generated_at.replace(':', '-').split('.')[0]}"
+        headers = {"Content-Disposition": f"attachment; filename={safe_base}.json"}
+        return Response(content=body, media_type="application/json; charset=utf-8", headers=headers)
+    
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported format")
+
+
+@router.get("/compliance/nist-privacy/{policy_id}")
+def nist_privacy_compliance_report(
+    *,
+    policy_id: int,
+    tenant_id: int = Query(..., ge=1),
+    from_: Optional[str] = Query(None, alias="from"),
+    to: Optional[str] = Query(None),
+    format: str = Query("json"),
+    db: Session = Depends(get_db),
+    api_key=Depends(get_api_key),
+):
+    """Generate NIST Privacy Framework compliance report for a specific policy."""
+    # Get policy repository
+    from app.core.deps import get_policy_repo
+    policy_repo = next(get_policy_repo(db))
+    
+    # Fetch policy
+    policy_doc = policy_repo.get_policy(tenant_id=tenant_id, policy_id=policy_id)
+    if not policy_doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Policy not found")
+    
+    # Parse date range if provided
+    from_date = None
+    to_date = None
+    if from_:
+        try:
+            from_date = datetime.fromisoformat(from_.replace('Z', '+00:00'))
+        except:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid from date format")
+    if to:
+        try:
+            to_date = datetime.fromisoformat(to.replace('Z', '+00:00'))
+        except:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid to date format")
+    
+    # Generate report
+    reporter = NISTPrivacyReporter(db)
+    report = reporter.generate_report(policy_doc, tenant_id, from_date, to_date)
+    
+    fmt = (format or "json").lower()
+    
+    if fmt == "json":
+        import json
+        body = json.dumps(reporter.export_to_dict(report), indent=2).encode('utf-8')
+        safe_base = f"nist-privacy_p{policy_id}_{report.generated_at.replace(':', '-').split('.')[0]}"
+        headers = {"Content-Disposition": f"attachment; filename={safe_base}.json"}
+        return Response(content=body, media_type="application/json; charset=utf-8", headers=headers)
+    
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported format")
