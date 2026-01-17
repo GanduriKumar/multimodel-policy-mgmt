@@ -5,3 +5,4 @@ sqlalchemy~=2.0.45
 pydantic~=2.12.5
 pydantic-settings~=2.12.0
 pytest~=9.0.2
+python-certifi-win32 ~=1.6.1

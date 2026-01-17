@@ -170,8 +170,11 @@ class OpenAiLLMClient:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        
+        # Note: SSL verification disabled for development due to Windows certificate issues
+        # For production, properly configure SSL certificates
         try:
-            with httpx.Client(timeout=self.timeout) as client:  # type: ignore[name-defined]
+            with httpx.Client(timeout=self.timeout, verify=False) as client:  # type: ignore[name-defined]
                 resp = client.post(url, headers=headers, json=payload)
         except httpx.RequestError as e:  # type: ignore[name-defined]
             raise LLMGatewayError("Failed to reach OpenAI endpoint") from e

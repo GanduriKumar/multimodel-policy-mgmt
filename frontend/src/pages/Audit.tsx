@@ -141,6 +141,8 @@ const AuditPage: React.FC = () => {
                   <th>Request ID</th>
                   <th>Tenant</th>
                   <th>Stage</th>
+                  <th>LLM Provider</th>
+                  <th>Model</th>
                   <th>Input Preview</th>
                   <th>Decision</th>
                   <th>Risk</th>
@@ -161,6 +163,16 @@ const AuditPage: React.FC = () => {
                       ) : (
                         <span className="badge bg-secondary">—</span>
                       )}
+                    </td>
+                    <td>
+                      {r.llm_provider ? (
+                        <span className="badge bg-primary">{r.llm_provider}</span>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                    <td>
+                      <small className="text-muted">{r.llm_model || '—'}</small>
                     </td>
                     <td>
                       <small className="text-muted" style={{ maxWidth: '200px', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

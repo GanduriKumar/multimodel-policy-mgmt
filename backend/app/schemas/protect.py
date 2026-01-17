@@ -28,6 +28,10 @@ class ProtectRequest(BaseModel):
     user_agent: Optional[str] = Field(default=None, description="Caller user agent")
     client_ip: Optional[str] = Field(default=None, description="Caller IP address")
     metadata: Optional[Dict[str, Any]] = Field(default=None, description="Arbitrary metadata")
+    llm_provider: Optional[str] = Field(
+        default=None,
+        description="LLM provider to use: 'openai', 'ollama', or 'vertex'. Defaults to configured provider."
+    )
 
 
 class ProtectResponse(BaseModel):

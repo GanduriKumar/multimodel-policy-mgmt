@@ -29,6 +29,7 @@ class ProtectGenerateRequest(ProtectRequest):
     - retrieval_query: the exact query used to retrieve evidence (optional)
     - evidence_payloads: raw evidence chunk payloads if the client wants
       to send them explicitly (each item is a dict with keys like text, source_uri, metadata)
+    - llm_provider: inherited from ProtectRequest, allows provider selection
     """
 
     retrieval_query: Optional[str] = Field(default=None, description="RAG retrieval query text")

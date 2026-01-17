@@ -11,10 +11,20 @@ Fields loaded (env var names in parentheses):
 - auth_hmac_secret (AUTH_HMAC_SECRET, API_KEY_SECRET, AUTH_SECRET, SECRET_KEY, APP_AUTH_SECRET)
 - default_risk_threshold (DEFAULT_RISK_THRESHOLD)
 
+LLM Provider Settings:
+- openai_api_key (OPENAI_API_KEY)
+- openai_model (OPENAI_MODEL)
+- openai_base_url (OPENAI_BASE_URL)
+- ollama_base_url (OLLAMA_BASE_URL)
+- ollama_model (OLLAMA_MODEL)
+- vertex_project_id (VERTEX_PROJECT_ID)
+- vertex_location (VERTEX_LOCATION)
+
 Usage:
     from app.core.config import get_settings
     settings = get_settings()
     print(settings.db_url)
+    print(settings.openai_api_key)
 """
 
 from __future__ import annotations
@@ -55,6 +65,19 @@ try:  # Pydantic v2 style
             default=80, alias="DEFAULT_RISK_THRESHOLD", ge=0, le=100
         )
 
+        # LLM Provider Settings (OpenAI)
+        openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+        openai_model: str | None = Field(default=None, alias="OPENAI_MODEL")
+        openai_base_url: str | None = Field(default=None, alias="OPENAI_BASE_URL")
+
+        # LLM Provider Settings (Ollama)
+        ollama_base_url: str | None = Field(default=None, alias="OLLAMA_BASE_URL")
+        ollama_model: str | None = Field(default=None, alias="OLLAMA_MODEL")
+
+        # LLM Provider Settings (Vertex AI)
+        vertex_project_id: str | None = Field(default=None, alias="VERTEX_PROJECT_ID")
+        vertex_location: str | None = Field(default=None, alias="VERTEX_LOCATION")
+
         model_config = SettingsConfigDict(
             env_file=".env",
             env_file_encoding="utf-8",
@@ -81,6 +104,19 @@ except Exception:  # pragma: no cover - Pydantic v1 fallback
         # Default risk threshold (0-100)
         default_risk_threshold: int = Field(default=80, ge=0, le=100)
 
+        # LLM Provider Settings (OpenAI)
+        openai_api_key: str = Field(default=None)
+        openai_model: str = Field(default=None)
+        openai_base_url: str = Field(default=None)
+
+        # LLM Provider Settings (Ollama)
+        ollama_base_url: str = Field(default=None)
+        ollama_model: str = Field(default=None)
+
+        # LLM Provider Settings (Vertex AI)
+        vertex_project_id: str = Field(default=None)
+        vertex_location: str = Field(default=None)
+
         class Config:  # type: ignore
             env_file = ".env"
             env_file_encoding = "utf-8"
@@ -100,6 +136,13 @@ except Exception:  # pragma: no cover - Pydantic v1 fallback
                 "log_level": {"env": ["LOG_LEVEL"]},
                 "api_key_header": {"env": ["API_KEY_HEADER"]},
                 "default_risk_threshold": {"env": ["DEFAULT_RISK_THRESHOLD"]},
+                "openai_api_key": {"env": ["OPENAI_API_KEY"]},
+                "openai_model": {"env": ["OPENAI_MODEL"]},
+                "openai_base_url": {"env": ["OPENAI_BASE_URL"]},
+                "ollama_base_url": {"env": ["OLLAMA_BASE_URL"]},
+                "ollama_model": {"env": ["OLLAMA_MODEL"]},
+                "vertex_project_id": {"env": ["VERTEX_PROJECT_ID"]},
+                "vertex_location": {"env": ["VERTEX_LOCATION"]},
             }
 
 

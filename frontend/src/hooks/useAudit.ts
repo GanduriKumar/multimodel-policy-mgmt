@@ -8,6 +8,8 @@ export type AuditListRow = {
   decision?: boolean | null;
   risk_score?: number | null;
   stage?: string | null;
+  llm_provider?: string | null;
+  llm_model?: string | null;
   input_text_preview?: string | null;
   created_at: string; // ISO date
 };

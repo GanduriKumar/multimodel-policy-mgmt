@@ -69,6 +69,12 @@ class GovernedGenerationService:
         )
 
         # 2) Policy protect pre-check
+        pre_metadata = dict(request.metadata or {})
+        pre_metadata["stage"] = "pre"
+        pre_metadata["trace_id"] = trace_id
+        pre_metadata["llm_provider"] = getattr(request, "llm_provider", None) or "ollama"
+        pre_metadata["llm_model"] = getattr(self.llm, "model", None)
+        
         result = self.decision_service.protect(
             tenant_id=request.tenant_id,
             input_text=request.input_text,
@@ -78,7 +84,7 @@ class GovernedGenerationService:
             request_id=request.request_id,
             user_agent=None,
             client_ip=None,
-            metadata=request.metadata,
+            metadata=pre_metadata,
         )
 
         # Split reasons heuristically for response fields

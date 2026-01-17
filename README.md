@@ -202,7 +202,7 @@ One‑call orchestration: Protect‑Generate
   - evidence_types?: string[]
   - retrieval_query?: string
   - evidence_payloads?: array of { text: string, source_uri?: string, metadata?: object, document_hash?: string, chunk_hash?: string }
-  - llm?: { provider?: "ollama" | "openai", model?: string }
+  - llm_provider?: string — LLM provider to use: "ollama", "openai", or "vertex" (defaults to ollama)
 - Response adds:
   - policy_reasons, risk_reasons (split reasons)
   - grounded_claims: [{ claim: { text }, score, supported, matched_evidence_ids }]
@@ -217,6 +217,7 @@ curl -X POST http://localhost:8000/api/protect-generate \
     "tenant_id": 1,
     "policy_slug": "content-safety",
     "input_text": "Draft a brief policy summary.",
+    "llm_provider": "openai",
     "evidence_types": [],
     "retrieval_query": "policy overview"
   }'
@@ -370,6 +371,7 @@ Audit (list, detail, export)
   - Manage policies: [backend/CreatePolicy.md](backend/CreatePolicy.md)
   - Deploy & integrate: [backend/Deploy&Integrate.md](backend/Deploy&Integrate.md)
   - Sample integration: [backend/SampleAPPIntegration.md](backend/SampleAPPIntegration.md)
+  - Multi-provider LLM support: [backend/MULTI_PROVIDER_LLM.md](backend/MULTI_PROVIDER_LLM.md)
 
 Traces (correlation helper)
 - Route: [backend/app/api/routes/traces.py](backend/app/api/routes/traces.py)

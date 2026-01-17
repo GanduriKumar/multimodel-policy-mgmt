@@ -29,8 +29,10 @@ def _to_row(item: Any, decision: Optional[Any]) -> AuditListRow:
     Convert RequestLog (and optional DecisionLog) to AuditListRow.
     Supports both Pydantic v1/v2 by creating the model from plain fields.
     """
-    # Extract stage from metadata
+    # Extract stage, llm_provider, and llm_model from metadata
     stage = None
+    llm_provider = None
+    llm_model = None
     input_text = getattr(item, "input_text", "")
     input_text_preview = input_text[:100] if input_text else None
     
@@ -38,6 +40,8 @@ def _to_row(item: Any, decision: Optional[Any]) -> AuditListRow:
         meta = getattr(item, "metadata_json", None)
         if isinstance(meta, dict):
             stage = meta.get("stage")
+            llm_provider = meta.get("llm_provider")
+            llm_model = meta.get("llm_model")
     except Exception:
         pass
     
@@ -48,6 +52,8 @@ def _to_row(item: Any, decision: Optional[Any]) -> AuditListRow:
         decision=(getattr(decision, "allowed", None) if decision is not None else None),
         risk_score=(getattr(decision, "risk_score", None) if decision is not None else None),
         stage=stage,
+        llm_provider=llm_provider,
+        llm_model=llm_model,
         input_text_preview=input_text_preview,
         created_at=getattr(item, "created_at"),
     )

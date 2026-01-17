@@ -41,6 +41,8 @@ class AuditListRow(ORMBase):
     decision: Optional[bool] = Field(default=None, description="Decision outcome if available")
     risk_score: Optional[int] = Field(default=None, ge=0, le=100, description="Risk score if available")
     stage: Optional[str] = Field(default=None, description="Pre-check or post-check stage")
+    llm_provider: Optional[str] = Field(default=None, description="LLM provider used (openai, ollama, vertex)")
+    llm_model: Optional[str] = Field(default=None, description="LLM model name")
     input_text_preview: Optional[str] = Field(default=None, description="First 100 chars of input text")
     created_at: datetime = Field(..., description="Request creation timestamp")
 

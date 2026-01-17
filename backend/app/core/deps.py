@@ -142,15 +142,15 @@ def get_decision_service(
 # Optional service providers (LLM/RAG/Ledger/Groundedness)
 # -------------------------------
 
-def get_llm_client() -> LLMClient:  # type: ignore[valid-type]
+def get_llm_client(provider: Optional[str] = None) -> LLMClient:  # type: ignore[valid-type]
     """
-    Return an LLM client instance. Selection can be extended to read from settings.
-    Default is a no-op or Ollama client if available.
+    Return an LLM client instance. Provider can be specified or defaults to Ollama.
+    
+    Args:
+        provider: Optional provider name ('openai', 'ollama', 'vertex')
     """
-    if OllamaLLMClient is not None:
-        return OllamaLLMClient()  # type: ignore[call-arg]
-    # Fallback placeholder; callers should handle capabilities accordingly.
-    return LLMClient  # type: ignore[return-value]
+    from app.services.llm_gateway import create_llm_client
+    return create_llm_client(provider)
 
 def get_rag_proxy() -> RAGProxy:  # type: ignore[valid-type]
     return RAGProxy()  # type: ignore[call-arg]
@@ -167,14 +167,19 @@ def get_groundedness_engine() -> GroundednessEngine:  # type: ignore[valid-type]
 
 def get_governed_generation_service(
     decision_service: DecisionService = Depends(get_decision_service),
+    llm_provider: Optional[str] = None,
 ):
     """
     Provide a GovernedGenerationService instance wired with optional dependencies.
     Kept loosely typed here to avoid import-time hard deps.
+    
+    Args:
+        decision_service: Decision service dependency
+        llm_provider: Optional LLM provider name to use
     """
     from app.services.governed_generation_service import GovernedGenerationService
     return GovernedGenerationService(
-        llm_client=get_llm_client(),
+        llm_client=get_llm_client(llm_provider),
         rag_proxy=get_rag_proxy(),
         ledger=get_governance_ledger(),
         groundedness_engine=get_groundedness_engine(),
