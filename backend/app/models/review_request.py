@@ -173,6 +173,12 @@ class ReviewRequest(Base):
         index=True
     )
 
+    # Backward-compatible alias used by tests: reviewed_at maps to completed_at
+    @property
+    def reviewed_at(self) -> datetime | None:
+        """Return the time when review was completed (alias for completed_at)."""
+        return self.completed_at
+
     # Context for reviewer
     decision_context: Mapped[dict | None] = mapped_column(
         JSON,

@@ -37,15 +37,20 @@ def _local_intent_classifier(text: str) -> Dict[str, float]:
     """
     text_l = text.lower()
     scores: Dict[str, float] = {}
+    
     # Weapon instruction heuristics
     if any(k in text_l for k in ["how to build a bomb", "make a bomb", "build a weapon", "assemble a gun", "explosive recipe", "detonator"]):
         scores["weapon_instruction"] = 0.9
     elif any(k in text_l for k in ["how to make", "how to build"]) and any(k in text_l for k in ["bomb", "gun", "explosive", "detonator", "weapon"]):
         scores["weapon_instruction"] = max(scores.get("weapon_instruction", 0), 0.75)
-    # Incite violence heuristics (expanded)
+    
+    # Incite violence heuristics (expanded to include harm planning)
     incite_phrases = [
         "kill them",
         "kill all",
+        "kill someone",
+        "murder someone",
+        "murder them",
         "attack them",
         "attack the city",
         "bomb the city",
@@ -59,10 +64,38 @@ def _local_intent_classifier(text: str) -> Dict[str, float]:
         "annihilate",
         "genocide",
         "harm them",
+        "harm someone",
         "exterminate",
+        "eliminate someone",
+        "eliminate them",
+        "assassinate",
+        "get rid of someone",
+        "get rid of them",
     ]
+    
+    # Harm planning phrases (how to/plan to cause harm)
+    harm_planning = [
+        "how to kill",
+        "how to murder",
+        "how to eliminate",
+        "how to harm",
+        "how to hurt",
+        "plan to kill",
+        "plan to murder",
+        "plan to eliminate",
+        "plan to harm",
+        "plan to hurt",
+        "plan how to kill",
+        "plan how to murder",
+        "plan how to eliminate",
+        "plan how to harm",
+    ]
+    
     if any(k in text_l for k in incite_phrases):
         scores["incite_violence"] = max(scores.get("incite_violence", 0), 0.9)
+    elif any(k in text_l for k in harm_planning):
+        scores["incite_violence"] = max(scores.get("incite_violence", 0), 0.95)
+    
     # Depiction (usually allowed)
     depiction_cues = [
         "murder mystery",
@@ -81,6 +114,7 @@ def _local_intent_classifier(text: str) -> Dict[str, float]:
         scores["depict_violence"] = max(scores.get("depict_violence", 0), 0.7)
     elif any(k in text_l for k in ["murder mystery", "murder story", "violent scene", "crime thriller"]):
         scores["depict_violence"] = max(scores.get("depict_violence", 0), 0.6)
+    
     return scores
 
 

@@ -12,6 +12,8 @@ export interface ApiClient {
   apiGet<T = unknown>(path: string, params?: Record<string, string | number | boolean | undefined>): Promise<T>;
   apiPost<T = unknown, B = unknown>(path: string, body?: B): Promise<T>;
   apiDelete<T = unknown, B = unknown>(path: string, body?: B): Promise<T>;
+  // Raw response getter for downloads or when headers are needed
+  apiGetResponse(path: string, params?: Record<string, string | number | boolean | undefined>): Promise<Response>;
 };
 
 interface ClientOptions {
@@ -23,7 +25,7 @@ interface ClientOptions {
 
 // Read defaults from Vite environment
 const ENV = (import.meta as any).env ?? {};
-const DEFAULT_BASE_URL: string | undefined = ENV.VITE_API_BASE_URL;
+const DEFAULT_BASE_URL: string | undefined = ENV.VITE_API_BASE_URL || 'http://localhost:8000/api';
 const DEFAULT_API_KEY: string | undefined = ENV.VITE_API_KEY;
 
 function buildUrl(baseUrl: string, path: string): string {
@@ -86,12 +88,7 @@ export function createApiClient(options: ClientOptions = {}): ApiClient {
   const apiKeyHeader = options.apiKeyHeader || "x-api-key";
   const fetchFn: FetchLike = options.fetchFn || (globalThis.fetch as FetchLike);
 
-  if (!baseUrl) {
-    // Friendly error to catch misconfiguration early in dev
-    // Do not throw in module scope to keep tests flexible
-    // eslint-disable-next-line no-console
-    console.warn("API base URL is not configured. Set VITE_API_BASE_URL in your env.");
-  }
+  // baseUrl always has a fallback for local dev; if customized, set VITE_API_BASE_URL
 
   // Shared headers
   const defaultHeaders: Record<string, string> = {
@@ -110,6 +107,21 @@ export function createApiClient(options: ClientOptions = {}): ApiClient {
       credentials: "include",
     });
     return handleResponse<T>(res);
+  }
+
+  // GET returning raw Response (for downloads)
+  async function apiGetResponse(path: string, params?: Record<string, string | number | boolean | undefined>): Promise<Response> {
+    const url = buildUrl(baseUrl, path) + buildQuery(params);
+    const res = await fetchFn(url, {
+      method: "GET",
+      headers: defaultHeaders,
+      credentials: "include",
+    });
+    if (!res.ok) {
+      // Reuse error handling
+      await handleResponse(res);
+    }
+    return res;
   }
 
   // POST helper
@@ -144,7 +156,7 @@ export function createApiClient(options: ClientOptions = {}): ApiClient {
     return handleResponse<T>(res);
   }
 
-  return { apiGet, apiPost, apiDelete };
+  return { apiGet, apiPost, apiDelete, apiGetResponse };
 }
 
 // Default client instance for app usage

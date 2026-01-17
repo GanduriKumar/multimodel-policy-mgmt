@@ -27,5 +27,5 @@ def protect_and_generate(
         # Keep error surface minimal and consistent
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"protect-generate failed: {e}",
+            detail="Internal error",
         ) from e

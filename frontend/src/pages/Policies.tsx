@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import usePolicies, { type PolicyOut, type PolicyVersionOut, type CreatePolicyPayload } from '../hooks/usePolicies';
+import useReports, { type ComplianceFramework, type ReportFormat } from '../hooks/useReports';
 
 const Policies: React.FC = () => {
   const { items, total, loading, error, listPolicies, createPolicy, addVersion, activateVersion, getActiveVersion, listVersions, deletePolicy, resetError } = usePolicies();
@@ -13,7 +14,7 @@ const Policies: React.FC = () => {
   const [isActive, setIsActive] = useState<boolean>(true);
   const [creating, setCreating] = useState<boolean>(false);
 
-  // Per-policy UI state for versioning and activation
+  // Per-policy UI state for versioning, activation, and report downloads
   type RowState = {
     docText: string;
     isActive: boolean;
@@ -21,8 +22,12 @@ const Policies: React.FC = () => {
     busy: boolean;
     error: string | null;
     lastVersion?: PolicyVersionOut | null;
+    reportFramework?: ComplianceFramework;
+    reportFormat?: ReportFormat;
+    reportBusy?: boolean;
   };
   const [rowState, setRowState] = useState<Record<number, RowState>>({});
+  const { downloadComplianceReport } = useReports();
   const [selectedJson, setSelectedJson] = useState<{
     policyId: number;
     jsonText: string;
@@ -66,6 +71,9 @@ const Policies: React.FC = () => {
         busy: false,
         error: null,
         lastVersion: undefined,
+        reportFramework: 'eu-ai-act',
+        reportFormat: 'json',
+        reportBusy: false,
       },
     [rowState]
   );
@@ -629,6 +637,40 @@ const Policies: React.FC = () => {
                         >
                           View
                         </button>
+                        <div className="dropdown">
+                          <button className="btn btn-sm btn-outline-dark dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Regulatory report
+                          </button>
+                          <ul className="dropdown-menu">
+                            {(['eu-ai-act','nist-ai-rmf','nist-privacy'] as ComplianceFramework[]).map((fw) => (
+                              <React.Fragment key={fw}>
+                                <li className="dropdown-header">{fw.toUpperCase()}</li>
+                                {(['json','csv','html'] as ReportFormat[]).map((fmt) => (
+                                  <li key={`${fw}-${fmt}`}>
+                                    <button
+                                      className="dropdown-item"
+                                      onClick={async () => {
+                                        setRow(p.id, { reportBusy: true, reportFramework: fw, reportFormat: fmt });
+                                        try {
+                                          await downloadComplianceReport(p.id, fw, 1, fmt);
+                                        } catch (e: any) {
+                                          alert(e?.message ?? 'Failed to download');
+                                        } finally {
+                                          setRow(p.id, { reportBusy: false });
+                                        }
+                                      }}
+                                    >
+                                      {rs.reportBusy && rs.reportFramework === fw && rs.reportFormat === fmt 
+                                        ? 'Downloading…' 
+                                        : `${fmt.toUpperCase()}`}
+                                    </button>
+                                  </li>
+                                ))}
+                                <li><hr className="dropdown-divider" /></li>
+                              </React.Fragment>
+                            ))}
+                          </ul>
+                        </div>
                       </td>
                     </tr>
                   );

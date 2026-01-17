@@ -20,6 +20,7 @@ from fastapi import APIRouter
 
 # Direct imports - any error will be visible at startup
 from app.api.routes.protect import router as protect_router
+from app.api.routes.protect_generate import router as protect_generate_router
 from app.api.routes.policies import router as policies_router
 from app.api.routes.evidence import router as evidence_router
 from app.api.routes.audit import router as audit_router
@@ -34,6 +35,7 @@ router = APIRouter()
 
 # Include all known routers
 router.include_router(protect_router)
+router.include_router(protect_generate_router)
 router.include_router(policies_router)
 router.include_router(evidence_router)
 router.include_router(audit_router)

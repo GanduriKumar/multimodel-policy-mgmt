@@ -21,6 +21,8 @@ from app.services.reports.decisions_html_renderer import render_decisions_html
 from app.services.eu_ai_act_reporter import EUAIActReporter
 from app.services.nist_ai_rmf_reporter import NISTAIRMFReporter
 from app.services.nist_privacy_reporter import NISTPrivacyReporter
+from app.schemas.policy_format import PolicyDoc
+from app.services.reports.compliance_renderers import compliance_to_csv, compliance_to_html
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
@@ -195,14 +197,25 @@ def eu_ai_act_compliance_report(
     api_key=Depends(get_api_key),
 ):
     """Generate EU AI Act compliance report for a specific policy."""
-    # Get policy repository
-    from app.core.deps import get_policy_repo
-    policy_repo = next(get_policy_repo(db))
-    
-    # Fetch policy
-    policy_doc = policy_repo.get_policy(tenant_id=tenant_id, policy_id=policy_id)
-    if not policy_doc:
+    # Instantiate concrete repository directly (avoids incorrect iterator usage)
+    from app.repos.policy_repo import SqlAlchemyPolicyRepo
+    policy_repo = SqlAlchemyPolicyRepo(db)
+
+    # Fetch policy and active version document
+    policy = policy_repo.get_policy_by_id(int(policy_id))
+    if policy is None or int(policy.tenant_id) != int(tenant_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Policy not found")
+    pv = policy_repo.get_active_version(int(policy.id))
+    if pv is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active version for this policy")
+    raw_doc = dict(getattr(pv, "document", {}) or {})
+    # Build PolicyDoc with metadata
+    try:
+        merged = {**raw_doc, "id": int(policy.id), "name": str(policy.name), "version": int(pv.version)}
+        policy_doc = PolicyDoc(**merged)
+    except Exception:
+        # Fallback to minimal PolicyDoc if the stored document is malformed
+        policy_doc = PolicyDoc(id=int(policy.id), name=str(policy.name), version=int(pv.version))
     
     # Parse date range if provided
     from_date = None
@@ -221,17 +234,26 @@ def eu_ai_act_compliance_report(
     # Generate report
     reporter = EUAIActReporter(db)
     report = reporter.generate_report(policy_doc, tenant_id, from_date, to_date)
+    report_dict = reporter.export_to_dict(report)
     
     fmt = (format or "json").lower()
+    safe_base = f"eu-ai-act_p{policy_id}_{report.generated_at.replace(':', '-').split('.')[0]}"
     
     if fmt == "json":
         import json
-        body = json.dumps(reporter.export_to_dict(report), indent=2).encode('utf-8')
-        safe_base = f"eu-ai-act_p{policy_id}_{report.generated_at.replace(':', '-').split('.')[0]}"
+        body = json.dumps(report_dict, indent=2).encode('utf-8')
         headers = {"Content-Disposition": f"attachment; filename={safe_base}.json"}
         return Response(content=body, media_type="application/json; charset=utf-8", headers=headers)
+    elif fmt == "csv":
+        body = compliance_to_csv(report_dict)
+        headers = {"Content-Disposition": f"attachment; filename={safe_base}.csv"}
+        return Response(content=body, media_type="text/csv; charset=utf-8", headers=headers)
+    elif fmt == "html":
+        body = compliance_to_html(report_dict)
+        headers = {"Content-Disposition": f"attachment; filename={safe_base}.html"}
+        return Response(content=body, media_type="text/html; charset=utf-8", headers=headers)
     
-    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported format")
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported format (use json, csv, or html)")
 
 
 @router.get("/compliance/nist-ai-rmf/{policy_id}")
@@ -246,14 +268,21 @@ def nist_ai_rmf_compliance_report(
     api_key=Depends(get_api_key),
 ):
     """Generate NIST AI RMF compliance report for a specific policy."""
-    # Get policy repository
-    from app.core.deps import get_policy_repo
-    policy_repo = next(get_policy_repo(db))
-    
-    # Fetch policy
-    policy_doc = policy_repo.get_policy(tenant_id=tenant_id, policy_id=policy_id)
-    if not policy_doc:
+    from app.repos.policy_repo import SqlAlchemyPolicyRepo
+    policy_repo = SqlAlchemyPolicyRepo(db)
+
+    policy = policy_repo.get_policy_by_id(int(policy_id))
+    if policy is None or int(policy.tenant_id) != int(tenant_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Policy not found")
+    pv = policy_repo.get_active_version(int(policy.id))
+    if pv is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active version for this policy")
+    raw_doc = dict(getattr(pv, "document", {}) or {})
+    try:
+        merged = {**raw_doc, "id": int(policy.id), "name": str(policy.name), "version": int(pv.version)}
+        policy_doc = PolicyDoc(**merged)
+    except Exception:
+        policy_doc = PolicyDoc(id=int(policy.id), name=str(policy.name), version=int(pv.version))
     
     # Parse date range if provided
     from_date = None
@@ -272,17 +301,26 @@ def nist_ai_rmf_compliance_report(
     # Generate report
     reporter = NISTAIRMFReporter(db)
     report = reporter.generate_report(policy_doc, tenant_id, from_date, to_date)
+    report_dict = reporter.export_to_dict(report)
     
     fmt = (format or "json").lower()
+    safe_base = f"nist-ai-rmf_p{policy_id}_{report.generated_at.replace(':', '-').split('.')[0]}"
     
     if fmt == "json":
         import json
-        body = json.dumps(reporter.export_to_dict(report), indent=2).encode('utf-8')
-        safe_base = f"nist-ai-rmf_p{policy_id}_{report.generated_at.replace(':', '-').split('.')[0]}"
+        body = json.dumps(report_dict, indent=2).encode('utf-8')
         headers = {"Content-Disposition": f"attachment; filename={safe_base}.json"}
         return Response(content=body, media_type="application/json; charset=utf-8", headers=headers)
+    elif fmt == "csv":
+        body = compliance_to_csv(report_dict)
+        headers = {"Content-Disposition": f"attachment; filename={safe_base}.csv"}
+        return Response(content=body, media_type="text/csv; charset=utf-8", headers=headers)
+    elif fmt == "html":
+        body = compliance_to_html(report_dict)
+        headers = {"Content-Disposition": f"attachment; filename={safe_base}.html"}
+        return Response(content=body, media_type="text/html; charset=utf-8", headers=headers)
     
-    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported format")
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported format (use json, csv, or html)")
 
 
 @router.get("/compliance/nist-privacy/{policy_id}")
@@ -297,14 +335,21 @@ def nist_privacy_compliance_report(
     api_key=Depends(get_api_key),
 ):
     """Generate NIST Privacy Framework compliance report for a specific policy."""
-    # Get policy repository
-    from app.core.deps import get_policy_repo
-    policy_repo = next(get_policy_repo(db))
-    
-    # Fetch policy
-    policy_doc = policy_repo.get_policy(tenant_id=tenant_id, policy_id=policy_id)
-    if not policy_doc:
+    from app.repos.policy_repo import SqlAlchemyPolicyRepo
+    policy_repo = SqlAlchemyPolicyRepo(db)
+
+    policy = policy_repo.get_policy_by_id(int(policy_id))
+    if policy is None or int(policy.tenant_id) != int(tenant_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Policy not found")
+    pv = policy_repo.get_active_version(int(policy.id))
+    if pv is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active version for this policy")
+    raw_doc = dict(getattr(pv, "document", {}) or {})
+    try:
+        merged = {**raw_doc, "id": int(policy.id), "name": str(policy.name), "version": int(pv.version)}
+        policy_doc = PolicyDoc(**merged)
+    except Exception:
+        policy_doc = PolicyDoc(id=int(policy.id), name=str(policy.name), version=int(pv.version))
     
     # Parse date range if provided
     from_date = None
@@ -323,14 +368,23 @@ def nist_privacy_compliance_report(
     # Generate report
     reporter = NISTPrivacyReporter(db)
     report = reporter.generate_report(policy_doc, tenant_id, from_date, to_date)
+    report_dict = reporter.export_to_dict(report)
     
     fmt = (format or "json").lower()
+    safe_base = f"nist-privacy_p{policy_id}_{report.generated_at.replace(':', '-').split('.')[0]}"
     
     if fmt == "json":
         import json
-        body = json.dumps(reporter.export_to_dict(report), indent=2).encode('utf-8')
-        safe_base = f"nist-privacy_p{policy_id}_{report.generated_at.replace(':', '-').split('.')[0]}"
+        body = json.dumps(report_dict, indent=2).encode('utf-8')
         headers = {"Content-Disposition": f"attachment; filename={safe_base}.json"}
         return Response(content=body, media_type="application/json; charset=utf-8", headers=headers)
+    elif fmt == "csv":
+        body = compliance_to_csv(report_dict)
+        headers = {"Content-Disposition": f"attachment; filename={safe_base}.csv"}
+        return Response(content=body, media_type="text/csv; charset=utf-8", headers=headers)
+    elif fmt == "html":
+        body = compliance_to_html(report_dict)
+        headers = {"Content-Disposition": f"attachment; filename={safe_base}.html"}
+        return Response(content=body, media_type="text/html; charset=utf-8", headers=headers)
     
-    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported format")
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported format (use json, csv, or html)")

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import api from '../api/client';
+import useReports, { type ComplianceFramework, type ReportFormat } from '../hooks/useReports';
 
 type DecisionEvent = {
   tenant_id: number;
@@ -332,6 +333,26 @@ const Dashboard: React.FC = () => {
     }
   }, [decPreset, decFrom, decTo, decFormat]);
 
+  // Compliance report download (per-policy)
+  const { downloadComplianceReport } = useReports();
+  const [compPolicyId, setCompPolicyId] = useState<string>('1');
+  const [compFramework, setCompFramework] = useState<ComplianceFramework>('eu-ai-act');
+  const [compFormat, setCompFormat] = useState<ReportFormat>('json');
+  const [compBusy, setCompBusy] = useState(false);
+  const onDownloadCompliance = useCallback(async () => {
+    setError(null);
+    setCompBusy(true);
+    try {
+      const pid = Number(compPolicyId);
+      if (!pid || pid < 1) throw new Error('Enter a valid policy ID');
+      await downloadComplianceReport(pid, compFramework, Number(TENANT_ID), compFormat);
+    } catch (e: any) {
+      setError(e?.message || 'Download failed');
+    } finally {
+      setCompBusy(false);
+    }
+  }, [compPolicyId, compFramework, compFormat]);
+
   return (
     <div className="container py-4 dashboard">
       <div className="d-flex align-items-center justify-content-between mb-3">
@@ -393,7 +414,7 @@ const Dashboard: React.FC = () => {
         <div className="card-header">Generate & Download</div>
         <div className="card-body">
           <div className="row g-3">
-            <div className="col-12 col-lg-6 d-flex">
+            <div className="col-12 col-lg-4 d-flex">
               <div className="card w-100 h-100">
                 <div className="card-header">Policy Changes</div>
                 <div className="card-body">
@@ -441,7 +462,7 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            <div className="col-12 col-lg-6 d-flex">
+            <div className="col-12 col-lg-4 d-flex">
               <div className="card w-100 h-100">
                 <div className="card-header">Decisions</div>
                 <div className="card-body">
@@ -485,6 +506,41 @@ const Dashboard: React.FC = () => {
                     </div>
                   </div>
                   <p className="text-muted small mt-2 mb-0">Timezone: {TZ}.</p>
+                </div>
+              </div>
+            </div>
+            <div className="col-12 col-lg-4 d-flex">
+              <div className="card w-100 h-100">
+                <div className="card-header">Regulatory Compliance</div>
+                <div className="card-body">
+                  <div className="row g-3 align-items-end">
+                    <div className="col-sm-6">
+                      <label className="form-label">Policy ID</label>
+                      <input className="form-control" value={compPolicyId} onChange={e => setCompPolicyId(e.target.value)} placeholder="1" />
+                    </div>
+                    <div className="col-sm-6">
+                      <label className="form-label">Framework</label>
+                      <select className="form-select" value={compFramework} onChange={e => setCompFramework(e.target.value as ComplianceFramework)}>
+                        <option value="eu-ai-act">EU AI Act</option>
+                        <option value="nist-ai-rmf">NIST AI RMF</option>
+                        <option value="nist-privacy">NIST Privacy</option>
+                      </select>
+                    </div>
+                    <div className="col-sm-6">
+                      <label className="form-label">Format</label>
+                      <select className="form-select" value={compFormat} onChange={e => setCompFormat(e.target.value as ReportFormat)}>
+                        <option value="json">JSON</option>
+                        <option value="csv">CSV</option>
+                        <option value="html">HTML</option>
+                      </select>
+                    </div>
+                    <div className="col-12">
+                      <button className="btn btn-primary" onClick={onDownloadCompliance} disabled={compBusy}>
+                        {compBusy ? 'Generating…' : 'Generate & Download'}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-muted small mt-2 mb-0">Download compliance report in selected format.</p>
                 </div>
               </div>
             </div>
