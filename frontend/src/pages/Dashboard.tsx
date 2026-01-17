@@ -337,7 +337,7 @@ const Dashboard: React.FC = () => {
   const { downloadComplianceReport } = useReports();
   const [compPolicyId, setCompPolicyId] = useState<string>('1');
   const [compFramework, setCompFramework] = useState<ComplianceFramework>('eu-ai-act');
-  const [compFormat, setCompFormat] = useState<ReportFormat>('json');
+  const [compFormat, setCompFormat] = useState<ReportFormat>('html');
   const [compBusy, setCompBusy] = useState(false);
   const onDownloadCompliance = useCallback(async () => {
     setError(null);

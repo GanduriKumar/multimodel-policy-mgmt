@@ -192,7 +192,7 @@ def eu_ai_act_compliance_report(
     tenant_id: int = Query(..., ge=1),
     from_: Optional[str] = Query(None, alias="from"),
     to: Optional[str] = Query(None),
-    format: str = Query("json"),
+    format: str = Query("html"),
     db: Session = Depends(get_db),
     api_key=Depends(get_api_key),
 ):
@@ -263,7 +263,7 @@ def nist_ai_rmf_compliance_report(
     tenant_id: int = Query(..., ge=1),
     from_: Optional[str] = Query(None, alias="from"),
     to: Optional[str] = Query(None),
-    format: str = Query("json"),
+    format: str = Query("html"),
     db: Session = Depends(get_db),
     api_key=Depends(get_api_key),
 ):
@@ -330,7 +330,7 @@ def nist_privacy_compliance_report(
     tenant_id: int = Query(..., ge=1),
     from_: Optional[str] = Query(None, alias="from"),
     to: Optional[str] = Query(None),
-    format: str = Query("json"),
+    format: str = Query("html"),
     db: Session = Depends(get_db),
     api_key=Depends(get_api_key),
 ):
