@@ -50,25 +50,53 @@ def compliance_to_csv(report_dict: Dict[str, Any]) -> bytes:
     framework = report_dict.get('framework', '')
     
     if 'EU AI Act' in framework:
-        writer.writerow(['Article', 'Title', 'Status', 'Evidence Count', 'Gaps', 'Recommendations'])
+        writer.writerow(['Article', 'Title', 'Status', 'Evidence Count', 'Evidence Details', 'Gaps', 'Recommendations'])
         for article in report_dict.get('articles', []):
+            evidence_list = article.get('evidence', [])
+            evidence_details = []
+            for ev in evidence_list:
+                ev_type = ev.get('type', 'unknown')
+                ev_field = ev.get('field', '')
+                ev_value = str(ev.get('value', ''))[:100]
+                evidence_details.append(f"{ev_type}: {ev_field} = {ev_value}")
+            
             writer.writerow([
                 f"Article {article.get('article_number', '')}",
                 article.get('article_title', ''),
                 article.get('status', ''),
-                len(article.get('evidence', [])),
+                len(evidence_list),
+                ' | '.join(evidence_details) if evidence_details else 'No evidence',
                 '; '.join(article.get('gaps', [])),
                 '; '.join(article.get('recommendations', []))
             ])
     
     elif 'NIST AI RMF' in framework:
-        writer.writerow(['Function', 'Description', 'Status', 'Categories', 'Gaps', 'Recommendations'])
+        writer.writerow(['Function', 'Description', 'Status', 'Categories', 'Category Evidence', 'Gaps', 'Recommendations'])
         for func in report_dict.get('functions', []):
+            categories = func.get('categories', [])
+            cat_evidence = []
+            for cat in categories:
+                cat_name = cat.get('name', cat.get('category', 'Unknown'))
+                evidence_data = cat.get('evidence', [])
+                
+                # Handle different evidence formats
+                if isinstance(evidence_data, list) and evidence_data:
+                    for ev in evidence_data[:2]:  # Limit to 2 evidence items per category in CSV
+                        if isinstance(ev, dict):
+                            ev_type = ev.get('type', 'unknown')
+                            ev_value = str(ev.get('value', ''))[:60]
+                            cat_evidence.append(f"{cat_name}: {ev_type}={ev_value}")
+                        else:
+                            cat_evidence.append(f"{cat_name}: {str(ev)[:60]}")
+                elif isinstance(evidence_data, str) and evidence_data:
+                    cat_evidence.append(f"{cat_name}: {evidence_data[:60]}")
+            
             writer.writerow([
                 func.get('function_name', ''),
                 func.get('function_description', ''),
                 func.get('status', ''),
-                len(func.get('categories', [])),
+                len(categories),
+                ' | '.join(cat_evidence) if cat_evidence else 'No evidence',
                 '; '.join(func.get('gaps', [])),
                 '; '.join(func.get('recommendations', []))
             ])
@@ -80,13 +108,32 @@ def compliance_to_csv(report_dict: Dict[str, Any]) -> bytes:
                 writer.writerow([key.replace('_', ' ').title(), value])
     
     elif 'NIST Privacy' in framework:
-        writer.writerow(['Function', 'Description', 'Status', 'Categories', 'Gaps', 'Recommendations'])
+        writer.writerow(['Function', 'Description', 'Status', 'Categories', 'Category Evidence', 'Gaps', 'Recommendations'])
         for func in report_dict.get('functions', []):
+            categories = func.get('categories', [])
+            cat_evidence = []
+            for cat in categories:
+                cat_name = cat.get('name', cat.get('category', 'Unknown'))
+                evidence_data = cat.get('evidence', [])
+                
+                # Handle different evidence formats
+                if isinstance(evidence_data, list) and evidence_data:
+                    for ev in evidence_data[:2]:  # Limit to 2 evidence items per category in CSV
+                        if isinstance(ev, dict):
+                            ev_type = ev.get('type', 'unknown')
+                            ev_value = str(ev.get('value', ''))[:60]
+                            cat_evidence.append(f"{cat_name}: {ev_type}={ev_value}")
+                        else:
+                            cat_evidence.append(f"{cat_name}: {str(ev)[:60]}")
+                elif isinstance(evidence_data, str) and evidence_data:
+                    cat_evidence.append(f"{cat_name}: {evidence_data[:60]}")
+            
             writer.writerow([
                 func.get('function_name', ''),
                 func.get('function_description', ''),
                 func.get('status', ''),
-                len(func.get('categories', [])),
+                len(categories),
+                ' | '.join(cat_evidence) if cat_evidence else 'No evidence',
                 '; '.join(func.get('gaps', [])),
                 '; '.join(func.get('recommendations', []))
             ])
@@ -318,6 +365,7 @@ def compliance_to_html(report_dict: Dict[str, Any]) -> str:
 """
             for article in articles:
                 status_class = f"status-{article.get('status', 'unknown')}"
+                evidence_list = article.get('evidence', [])
                 html += f"""
                 <tr>
                     <td><strong>Article {article.get('article_number', '')}</strong><br>
@@ -325,7 +373,23 @@ def compliance_to_html(report_dict: Dict[str, Any]) -> str:
                     </td>
                     <td>{article.get('requirement', 'N/A')}</td>
                     <td class="{status_class}">{article.get('status', 'unknown').replace('_', ' ').title()}</td>
-                    <td>{len(article.get('evidence', []))} items</td>
+                    <td>
+"""
+                # Display evidence details
+                if evidence_list:
+                    html += f"                        <strong>{len(evidence_list)} Evidence Items:</strong><ul class='list-items'>\n"
+                    for ev in evidence_list:
+                        ev_type = ev.get('type', 'unknown')
+                        ev_field = ev.get('field', '')
+                        ev_value = str(ev.get('value', ''))[:100]  # Truncate long values
+                        if len(str(ev.get('value', ''))) > 100:
+                            ev_value += '...'
+                        html += f"                            <li><strong>{ev_type}</strong>: {ev_field} = {ev_value}</li>\n"
+                    html += "                        </ul>\n"
+                else:
+                    html += "                        <em>No evidence found</em>\n"
+                html += """
+                    </td>
                     <td>
 """
                 gaps = article.get('gaps', [])
@@ -340,6 +404,8 @@ def compliance_to_html(report_dict: Dict[str, Any]) -> str:
                     for rec in recommendations:
                         html += f"                            <li>{rec}</li>\n"
                     html += "                        </ul>\n"
+                if not gaps and not recommendations:
+                    html += "                        <em>No gaps or recommendations</em>\n"
                 html += """
                     </td>
                 </tr>
@@ -367,13 +433,56 @@ def compliance_to_html(report_dict: Dict[str, Any]) -> str:
 """
             for func in functions:
                 status_class = f"status-{func.get('status', 'unknown')}"
+                categories = func.get('categories', [])
                 html += f"""
                 <tr>
                     <td><strong>{func.get('function_name', '')}</strong><br>
                         <small>{func.get('function_description', '')}</small>
                     </td>
                     <td class="{status_class}">{func.get('status', 'unknown').replace('_', ' ').title()}</td>
-                    <td>{len(func.get('categories', []))} categories</td>
+                    <td>
+"""
+                # Display category details with evidence
+                if categories:
+                    html += f"                        <strong>{len(categories)} Categories:</strong><ul class='list-items'>\n"
+                    for cat in categories:
+                        cat_name = cat.get('name', cat.get('category', 'Unknown'))
+                        cat_status = cat.get('status', 'unknown')
+                        evidence_data = cat.get('evidence', [])
+                        
+                        html += f"                            <li><strong>{cat_name}</strong> ({cat_status})<br>\n"
+                        
+                        # Handle different evidence formats
+                        if isinstance(evidence_data, list):
+                            # List of evidence dictionaries
+                            if evidence_data:
+                                html += "                                <small>Evidence:</small><ul>\n"
+                                for ev in evidence_data[:3]:  # Limit to first 3 evidence items per category
+                                    if isinstance(ev, dict):
+                                        ev_type = ev.get('type', 'unknown')
+                                        ev_value = str(ev.get('value', ''))[:80]
+                                        if len(str(ev.get('value', ''))) > 80:
+                                            ev_value += '...'
+                                        html += f"                                    <li>{ev_type}: {ev_value}</li>\n"
+                                    else:
+                                        html += f"                                    <li>{str(ev)[:80]}</li>\n"
+                                if len(evidence_data) > 3:
+                                    html += f"                                    <li><em>...and {len(evidence_data) - 3} more</em></li>\n"
+                                html += "                                </ul>\n"
+                            else:
+                                html += "                                <small><em>No evidence</em></small>\n"
+                        elif isinstance(evidence_data, str) and evidence_data:
+                            # String evidence
+                            html += f"                                <small>Evidence: {evidence_data[:100]}</small>\n"
+                        else:
+                            html += "                                <small><em>No evidence</em></small>\n"
+                        
+                        html += "                            </li>\n"
+                    html += "                        </ul>\n"
+                else:
+                    html += "                        <em>No categories assessed</em>\n"
+                html += """
+                    </td>
                     <td>
 """
                 gaps = func.get('gaps', [])
@@ -388,6 +497,8 @@ def compliance_to_html(report_dict: Dict[str, Any]) -> str:
                     for rec in recommendations:
                         html += f"                            <li>{rec}</li>\n"
                     html += "                        </ul>\n"
+                if not gaps and not recommendations:
+                    html += "                        <em>No gaps or recommendations</em>\n"
                 html += """
                     </td>
                 </tr>
@@ -433,13 +544,56 @@ def compliance_to_html(report_dict: Dict[str, Any]) -> str:
 """
             for func in functions:
                 status_class = f"status-{func.get('status', 'unknown')}"
+                categories = func.get('categories', [])
                 html += f"""
                 <tr>
                     <td><strong>{func.get('function_name', '')}</strong><br>
                         <small>{func.get('function_description', '')}</small>
                     </td>
                     <td class="{status_class}">{func.get('status', 'unknown').replace('_', ' ').title()}</td>
-                    <td>{len(func.get('categories', []))} categories</td>
+                    <td>
+"""
+                # Display category details with evidence
+                if categories:
+                    html += f"                        <strong>{len(categories)} Categories:</strong><ul class='list-items'>\n"
+                    for cat in categories:
+                        cat_name = cat.get('name', cat.get('category', 'Unknown'))
+                        cat_status = cat.get('status', 'unknown')
+                        evidence_data = cat.get('evidence', [])
+                        
+                        html += f"                            <li><strong>{cat_name}</strong> ({cat_status})<br>\n"
+                        
+                        # Handle different evidence formats
+                        if isinstance(evidence_data, list):
+                            # List of evidence dictionaries
+                            if evidence_data:
+                                html += "                                <small>Evidence:</small><ul>\n"
+                                for ev in evidence_data[:3]:  # Limit to first 3 evidence items per category
+                                    if isinstance(ev, dict):
+                                        ev_type = ev.get('type', 'unknown')
+                                        ev_value = str(ev.get('value', ''))[:80]
+                                        if len(str(ev.get('value', ''))) > 80:
+                                            ev_value += '...'
+                                        html += f"                                    <li>{ev_type}: {ev_value}</li>\n"
+                                    else:
+                                        html += f"                                    <li>{str(ev)[:80]}</li>\n"
+                                if len(evidence_data) > 3:
+                                    html += f"                                    <li><em>...and {len(evidence_data) - 3} more</em></li>\n"
+                                html += "                                </ul>\n"
+                            else:
+                                html += "                                <small><em>No evidence</em></small>\n"
+                        elif isinstance(evidence_data, str) and evidence_data:
+                            # String evidence
+                            html += f"                                <small>Evidence: {evidence_data[:100]}</small>\n"
+                        else:
+                            html += "                                <small><em>No evidence</em></small>\n"
+                        
+                        html += "                            </li>\n"
+                    html += "                        </ul>\n"
+                else:
+                    html += "                        <em>No categories assessed</em>\n"
+                html += """
+                    </td>
                     <td>
 """
                 gaps = func.get('gaps', [])
@@ -454,6 +608,8 @@ def compliance_to_html(report_dict: Dict[str, Any]) -> str:
                     for rec in recommendations:
                         html += f"                            <li>{rec}</li>\n"
                     html += "                        </ul>\n"
+                if not gaps and not recommendations:
+                    html += "                        <em>No gaps or recommendations</em>\n"
                 html += """
                     </td>
                 </tr>

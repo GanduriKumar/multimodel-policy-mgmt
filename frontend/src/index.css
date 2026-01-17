@@ -1,7 +1,10 @@
 /* Dashboard sizing helpers */
 .dashboard .chart-body {
   position: relative;
-  min-height: 220px;
+  min-height: 180px;
+  max-height: 180px;
+  padding: 0 !important;
+  overflow: hidden;
 }
 
 :root {

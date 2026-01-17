@@ -1,0 +1,28 @@
+﻿Compliance Report
+""
+Report ID,euaiact_1_20260117_174237
+Policy ID,1
+Policy Name,AI Content Safety Policy
+Framework,EU AI Act
+Generated At,2026-01-17T17:42:37.731385+00:00
+Overall Status,partial
+Compliance Score,57.1%
+""
+Summary
+total_articles,7
+compliant,3
+partial,2
+non_compliant,2
+not_applicable,0
+compliance_percentage,57.14
+critical_gaps,"['Article 12: Record-Keeping', 'Article 15: Accuracy, Robustness and Cybersecurity']"
+next_review_date,2026-04-17
+""
+Article,Title,Status,Evidence Count,Evidence Details,Gaps,Recommendations
+Article 9,Risk Management System,compliant,5,"configuration: risk_management_system = Comprehensive risk identification and mitigation framework with pattern-based and intent analysis | threshold: risk_acceptability_threshold = 70 | measures: risk_identification_measures = Automated risk scoring with pattern detection, intent classification, and violence detection | monitoring: continuous_risk_monitoring = True | process: iterative_risk_management = Continuous policy updates based on decision analytics and quarterly compliance reviews",,
+Article 10,Data and Data Governance,compliant,5,"quality: data_quality_measures = Automated validation, human review workflows, and evidence-based decision making | governance: data_governance_policies = Source validation, citation requirements, and evidence quality checks | relevance: training_data_relevance = N/A - System uses rule-based policies with pattern matching, not ML training | bias: bias_detection_mitigation = Intent classification tested across prompt variations; fairness metrics monitored | privacy: pii_enforcement = 4 PII protection rules active",,
+Article 11,Technical Documentation,compliant,5,"design: system_design_documentation = FastAPI backend with PolicyEngine, RiskEngine, DecisionService, and HumanOversightService architectu | versioning: policy_version = Version 4 | metrics: performance_metrics_documentation = Decision latency (<100ms), risk score accuracy (95%+), false positive/negative rates tracked | change_mgmt: change_management_procedures = Version-controlled policies with rollback capability, change audit trail, and approval workflow | configuration: policy_document = Complete policy configuration with 0 rules",,
+Article 12,Record-Keeping,non_compliant,1,system_capability: audit_trail_active = Audit trail system operational (backend/app/models/audit.py),Audit logging configuration not documented; Log retention period not specified; Tamper-proof logging not implemented,Configure comprehensive audit logging for all system decisions and operations; Set log retention period to at least 3-5 years; Implement cryptographic hashing or blockchain-based audit trail
+Article 13,Transparency and Provision of Information,partial,2,transparency: user_transparency_measures = Risk scores and detailed reasons provided for all decisions via API response | disclosure: purpose_and_limitations_disclosure = Policy purpose: content safety; Limitations: pattern-based detection may have false positives/negati,,
+Article 14,Human Oversight,partial,4,"oversight: human_oversight_measures = Human review workflow for high-risk decisions via HumanOversightService and ReviewRequest system | override: override_capabilities = Authorized reviewers can approve/reject decisions, update policy rules, and modify risk thresholds | system_capability: requires_human_review = Human review requirement enabled in policy | sla: human_oversight_sla = 24 hours SLA",,
+Article 15,"Accuracy, Robustness and Cybersecurity",non_compliant,2,system_capability: conservative_mode = Conservative mode enabled for safer decision-making | risk_monitoring: risk_threshold = Risk threshold set to 70,Accuracy metrics not documented; Cybersecurity measures not documented,"Define and monitor accuracy metrics (precision, recall, F1 score); Implement security measures including input validation, access controls, and encryption"

@@ -1,0 +1,31 @@
+﻿Compliance Report
+""
+Report ID,nistrmf_1_20260117_174237
+Policy ID,1
+Policy Name,AI Content Safety Policy
+Framework,NIST AI RMF
+Generated At,2026-01-17T17:42:37.742305+00:00
+Overall Status,partial
+Compliance Score,75.0%
+""
+Summary
+total_functions,4
+compliant,2
+partial,2
+non_compliant,0
+compliance_percentage,75.0
+risk_posture,low
+trustworthiness_level,high
+next_review_date,2026-04-17
+""
+Function,Description,Status,Categories,Category Evidence,Gaps,Recommendations
+GOVERN,Cultivates a culture of AI risk management and establishes governance structures,compliant,4,"Governance Structures: Cross-functional AI governance board with quarterly reviews  | Accountability: Clear ownership (PolicyEngine team), escalation paths, and i | Compliance Tracking: Compliance metadata tracked in policy",,
+MAP,Establishes context to frame risks related to the AI system,compliant,4,"System Context: Content safety system for GenAI applications protecting agai | Impact Assessments: Privacy impact: Medium, Safety impact: High, Fairness impact | Stakeholder Analysis: End users (protected from harmful content), content moderato | Policy Configuration: Policy with 0 rules configured",,
+MEASURE,Employs metrics and methodologies to assess AI trustworthiness and track risks,partial,2,Bias Testing: Intent detection accuracy: 95%+ across prompt variations; ba | Performance Monitoring: Risk threshold monitoring at 70,Fairness metrics not defined,"Define and monitor fairness metrics (demographic parity, equalized odds)"
+MANAGE,Allocates resources to manage AI risks on a regular basis,partial,3,"Risk Treatment: High-risk decisions require human review; extreme risk score | Human Oversight: Human review requirement enabled | Incident Response: False positive review process, policy update workflow, escal",,
+""
+Trustworthiness Scorecard
+Fairness Score,85.0
+Safety Score,88.0
+Privacy Score,95.0
+Overall Trustworthiness,89.33

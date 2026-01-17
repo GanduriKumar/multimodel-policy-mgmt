@@ -1,0 +1,34 @@
+﻿Compliance Report
+""
+Report ID,nistprivacy_1_20260117_174237
+Policy ID,1
+Policy Name,AI Content Safety Policy
+Framework,NIST Privacy Framework
+Generated At,2026-01-17T17:42:37.752939+00:00
+Overall Status,partial
+Compliance Score,80.0%
+""
+Summary
+total_functions,5
+compliant,4
+partial,0
+non_compliant,1
+compliance_percentage,80.0
+privacy_posture,strong
+pii_protection_level,moderate
+next_review_date,2026-04-17
+""
+Function,Description,Status,Categories,Category Evidence,Gaps,Recommendations
+IDENTIFY-P,Develop understanding of privacy risks in data processing,compliant,4,"Processing Purposes: Content safety enforcement, regulatory compliance reporting, | Privacy Risk Assessments: PIA conducted Q4 2025; Risk level: Medium; Mitigation: PII d | PII Identification: 4 PII rules configured",,
+GOVERN-P,Develop and implement organizational privacy governance structure,compliant,4,"Privacy Governance: Privacy board reviews quarterly; DPO assigned; GDPR/CCPA com | Data Minimization: Only essential data collected (prompt text, risk metadata);  | Individual Rights: Data subject rights (access, deletion, portability) requests | Policy Compliance Status: Policy compliance status: validated",,
+CONTROL-P,Develop and implement activities to enable organizations to manage data with sufficient granularity,compliant,4,PII Detection and Masking: 4 PII protection rules active | Access Controls: Restricted to compliance team and DPO; MFA required; all acc | Data Sharing Limitations: No third-party sharing; strict tenant isolation; cross-tenan,,
+COMMUNICATE-P,Develop and implement appropriate activities to enable organizations and individuals to have a reliable understanding about how data are processed,non_compliant,1,Consent Management: API usage implies consent to content analysis; explicit opt-,Privacy notices not provided; Privacy training not documented,"Publish clear, accessible privacy notices describing data processing; Provide regular privacy training to all personnel handling personal data"
+PROTECT-P,Develop and implement appropriate data processing safeguards,compliant,4,"Technical Safeguards: Encryption at rest (AES-256), in transit (TLS 1.3), database | Data Security: HMAC-SHA256 API key authentication, rate limiting (100 req/m | Incident Response: Breach notification within 72 hours per GDPR; incident respo | Automated PII Protection: Active PII protection with 4 enforcement rules",,
+""
+Privacy Metrics
+Pii Detection Rate,95.0
+Pii Masking Accuracy,98.0
+Data Minimization Score,88.0
+Consent Compliance Rate,97.0
+Individual Request Response Time,48.0
+Privacy Incident Count,0
