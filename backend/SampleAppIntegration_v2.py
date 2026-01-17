@@ -179,6 +179,7 @@ def _parse_args() -> argparse.Namespace:
                    help="LLM provider for unified mode: openai, ollama, vertex (default: ollama)")
     p.add_argument("--evidence-types", type=str, default="", help="Comma-separated evidence types.")
     p.add_argument("--evidence-ids", type=str, default="", help="Comma-separated evidence IDs.")
+    p.add_argument("--evidence-source", type=str, action="append", help="Evidence source (can be repeated). Format: 'text|source_uri'")
     p.add_argument("--backend-url", type=str, default=os.getenv("BACKEND_URL", "http://localhost:8000"))
     p.add_argument("--backend-api-key", type=str, default=os.getenv("BACKEND_API_KEY"))
     p.add_argument("--backend-api-key-header", type=str, default=os.getenv("BACKEND_API_KEY_HEADER", "x-api-key"))
@@ -195,7 +196,7 @@ def _read_stdin() -> str:
         raise RuntimeError(f"Failed reading STDIN: {e}") from e
 
 
-def run_sandwich_mode(args: argparse.Namespace, prompt: str, ev_types: Set[str], ev_ids: List[int]) -> int:
+def run_sandwich_mode(args: argparse.Namespace, prompt: str, ev_types: Set[str], ev_ids: List[int], evidence_payloads: List[Dict[str, Any]]) -> int:
     """MODE 1: Traditional pre-check → LLM → post-check pattern."""
     import uuid
     import time
@@ -279,7 +280,7 @@ def run_sandwich_mode(args: argparse.Namespace, prompt: str, ev_types: Set[str],
     return 0
 
 
-def run_unified_mode(args: argparse.Namespace, prompt: str, ev_types: Set[str], ev_ids: List[int]) -> int:
+def run_unified_mode(args: argparse.Namespace, prompt: str, ev_types: Set[str], ev_ids: List[int], evidence_payloads: List[Dict[str, Any]]) -> int:
     """MODE 2: Unified /api/protect-generate with multi-provider support."""
     import uuid
     import time
@@ -299,6 +300,7 @@ def run_unified_mode(args: argparse.Namespace, prompt: str, ev_types: Set[str], 
             text=prompt,
             llm_provider=args.llm_provider,  # NEW: provider selection
             evidence_types=ev_types,
+            evidence_payloads=evidence_payloads if evidence_payloads else None,
             metadata=meta,
             api_key=args.backend_api_key,
             api_key_header=args.backend_api_key_header,
@@ -348,11 +350,28 @@ def main() -> int:
         part = part.strip()
         if part.isdigit():
             ev_ids.append(int(part))
+    
+    # Parse evidence sources into payloads
+    evidence_payloads: List[Dict[str, Any]] = []
+    if args.evidence_source:
+        for source_spec in args.evidence_source:
+            # Format: "text|source_uri" or just "text"
+            parts = source_spec.split("|", 1)
+            if len(parts) == 2:
+                text, uri = parts
+            else:
+                text = parts[0]
+                uri = "inline-source"
+            evidence_payloads.append({
+                "text": text,
+                "source_uri": uri,
+                "metadata": {},
+            })
 
     if args.mode == "sandwich":
-        return run_sandwich_mode(args, prompt, ev_types, ev_ids)
+        return run_sandwich_mode(args, prompt, ev_types, ev_ids, evidence_payloads)
     else:  # unified
-        return run_unified_mode(args, prompt, ev_types, ev_ids)
+        return run_unified_mode(args, prompt, ev_types, ev_ids, evidence_payloads)
 
 
 if __name__ == "__main__":

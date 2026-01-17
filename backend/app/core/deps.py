@@ -110,6 +110,7 @@ class DecisionService:
         user_agent: Optional[str] = None,
         client_ip: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        stage: Optional[str] = None,
     ) -> ProtectResult:
         """Delegate to the module-level protect function with bound repositories.
 
@@ -128,6 +129,7 @@ class DecisionService:
             user_agent=user_agent,
             client_ip=client_ip,
             metadata=metadata,
+            stage=stage,
         )
 
 def get_decision_service(

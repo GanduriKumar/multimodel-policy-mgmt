@@ -304,28 +304,33 @@ const AuditPage: React.FC = () => {
               <div className="row mt-3">
                 <div className="col-12">
                   <h6>Sources (Evidence)</h6>
-                  {detail.evidence_ids && detail.evidence_ids.length > 0 ? (
+                  {detail.evidence_sources && detail.evidence_sources.length > 0 ? (
                     <div className="table-responsive">
                       <table className="table table-sm align-middle">
                         <thead>
                           <tr>
-                            <th>ID</th>
-                            <th>Action</th>
+                            <th>#</th>
+                            <th>Source</th>
+                            <th>Text Preview</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {detail.evidence_ids.map((id) => (
-                            <tr key={id}>
-                              <td>{id}</td>
-                              <td className="d-flex gap-2">
-                                <button
-                                  type="button"
-                                  className="btn btn-sm btn-outline-primary"
-                                  onClick={() => fetchEvidence(id)}
-                                  disabled={evidenceLoading}
-                                >
-                                  {evidenceLoading ? 'Loading…' : 'View'}
-                                </button>
+                          {detail.evidence_sources.map((source, idx) => (
+                            <tr key={idx}>
+                              <td>{idx + 1}</td>
+                              <td>
+                                {source.source_uri ? (
+                                  <a href={source.source_uri} target="_blank" rel="noopener noreferrer" className="text-decoration-none">
+                                    {source.source_uri}
+                                  </a>
+                                ) : (
+                                  <span className="text-muted">No URI</span>
+                                )}
+                              </td>
+                              <td>
+                                <small className="text-muted">
+                                  {source.text.substring(0, 100)}{source.text.length > 100 ? '...' : ''}
+                                </small>
                               </td>
                             </tr>
                           ))}

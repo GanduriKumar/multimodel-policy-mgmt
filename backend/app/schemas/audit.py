@@ -78,6 +78,7 @@ class DecisionDetail(ORMBase):
 
     # Evidence references associated with the request/decision
     evidence_ids: list[int] = Field(default_factory=list, description="Referenced evidence item IDs")
+    evidence_sources: list[dict] = Field(default_factory=list, description="RAG-retrieved evidence sources")
 
     # Request context
     stage: Optional[str] = Field(default=None, description="Pre-check or post-check stage")

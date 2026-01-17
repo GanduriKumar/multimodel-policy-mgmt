@@ -118,28 +118,34 @@ def _local_intent_classifier(text: str) -> Dict[str, float]:
     return scores
 
 
-def compute_risk(input_text: str, evidence_present: bool) -> tuple[int, list[str]]:
+def compute_risk(
+    text: str, 
+    *, 
+    evidence_present: bool = False,
+    check_evidence: bool = True
+) -> tuple[int, List[str]]:
     """
     Compute a risk score and reasons based on detectors and evidence presence.
 
     Args:
-        input_text: The text to analyze.
+        text: The text to analyze.
         evidence_present: Whether sufficient evidence is present to support claims.
+        check_evidence: Whether to check for evidence (False during pre-check, True during post-check).
 
     Returns:
         A tuple of (risk_score in [0, 100], reasons list).
     """
-    if not isinstance(input_text, str):
+    if not isinstance(text, str):
         raise TypeError("input_text must be a str")
     if not isinstance(evidence_present, bool):
         raise TypeError("evidence_present must be a bool")
 
     # Run detectors
-    inj_markers = detect_prompt_injection(input_text)
-    sec_markers = detect_secret_like(input_text)
-    pii_markers = detect_pii_like(input_text)
-    vio_markers = detect_violence_like(input_text)
-    intents = _local_intent_classifier(input_text)
+    inj_markers = detect_prompt_injection(text)
+    sec_markers = detect_secret_like(text)
+    pii_markers = detect_pii_like(text)
+    vio_markers = detect_violence_like(text)
+    intents = _local_intent_classifier(text)
 
     # Collect reasons (deduplicated)
     reasons: set[str] = set()
@@ -202,8 +208,8 @@ def compute_risk(input_text: str, evidence_present: bool) -> tuple[int, list[str
     if categories_present > 1:
         score += (categories_present - 1) * 5
 
-    # Evidence consideration
-    if not evidence_present:
+    # Evidence consideration (only during post-check stage)
+    if check_evidence and not evidence_present:
         score += 10
         reasons.add("evidence_missing")
 

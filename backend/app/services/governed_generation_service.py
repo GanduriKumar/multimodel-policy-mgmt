@@ -85,6 +85,7 @@ class GovernedGenerationService:
             user_agent=None,
             client_ip=None,
             metadata=pre_metadata,
+            stage="pre",
         )
 
         # Split reasons heuristically for response fields

@@ -14,9 +14,10 @@ from typing import Any, List, Optional, Type, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 
-from app.core.deps import get_audit_repo
+from app.core.deps import get_audit_repo, get_rag_proxy
 from app.core.contracts import AuditRepo
 from app.schemas.audit import AuditListRow, AuditListResponse, DecisionDetail
+from app.services.rag_proxy import RAGProxy
 
 
 router = APIRouter(prefix="/api/audit", tags=["audit"])
@@ -107,6 +108,7 @@ def list_requests(
 def get_decision_detail(
     decision_id: int = Path(..., ge=1, description="Decision identifier (or request id fallback)"),
     repo: AuditRepo = Depends(get_audit_repo),
+    rag: RAGProxy = Depends(get_rag_proxy),
 ) -> DecisionDetail:
     """
     Retrieve decision detail by id. If the repository doesn't expose a direct
@@ -173,6 +175,25 @@ def get_decision_detail(
         # Best-effort extraction; ignore failures
         evidence_ids = []
 
+    # Retrieve RAG evidence sources if correlation_id or trace_id is available
+    evidence_sources = []
+    try:
+        trace_id = correlation_id  # Use correlation_id as trace_id
+        if trace_id and hasattr(rag, "get_retrieval"):
+            retrieval_data = getattr(rag, "get_retrieval")(trace_id)
+            if retrieval_data and isinstance(retrieval_data, dict):
+                chunks = retrieval_data.get("chunks", [])
+                for chunk in chunks:
+                    if isinstance(chunk, dict):
+                        evidence_sources.append({
+                            "text": chunk.get("text", ""),
+                            "source_uri": chunk.get("source_uri") or chunk.get("source"),
+                            "metadata": chunk.get("metadata", {}),
+                        })
+    except Exception:
+        # Best-effort; ignore failures
+        pass
+
     return DecisionDetail(
         decision_id=getattr(decision, "id"),
         request_log_id=getattr(decision, "request_log_id"),
@@ -184,6 +205,7 @@ def get_decision_detail(
         policy_reasons=policy_reasons,
         risk_reasons=risk_reasons,
         evidence_ids=evidence_ids,
+        evidence_sources=evidence_sources,
         stage=stage,
         input_text=input_text,
         correlation_id=correlation_id,

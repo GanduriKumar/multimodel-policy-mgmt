@@ -30,6 +30,11 @@ export type DecisionDetail = {
   policy_reasons: string[];
   risk_reasons: string[];
   evidence_ids: number[];
+  evidence_sources?: Array<{
+    text: string;
+    source_uri?: string | null;
+    metadata?: Record<string, any>;
+  }>;
   stage?: string | null;
   input_text?: string | null;
   correlation_id?: string | null;

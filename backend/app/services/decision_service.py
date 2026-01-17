@@ -103,6 +103,7 @@ def protect(
     user_agent: Optional[str] = None,
     client_ip: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
+    stage: Optional[str] = None,
 ) -> ProtectResult:
     """
     Orchestrate protection workflow: log request, evaluate policy, compute risk, log decision.
@@ -120,6 +121,7 @@ def protect(
         user_agent: Optional user agent string.
         client_ip: Optional client IP string.
         metadata: Optional metadata for request log.
+        stage: Optional stage identifier ("pre" or "post"). Evidence checks only run on "post".
 
     Returns:
         ProtectResult dict with allow/deny, reasons, risk_score, and log IDs.
@@ -216,8 +218,14 @@ def protect(
         policy_reasons.extend(pii_reasons)
 
     # 4) Compute risk score (evidence presence is a simple boolean)
+    # Only check evidence during post-check stage (after content generation)
     evidence_present = bool(ev_types)
-    risk_score, risk_reasons = compute_risk(input_text, evidence_present=evidence_present)
+    check_evidence = (stage == "post")  # Only enforce evidence in post-check
+    risk_score, risk_reasons = compute_risk(
+        input_text, 
+        evidence_present=evidence_present,
+        check_evidence=check_evidence
+    )
     # 4b) Conservative risk floor: elevate score up to threshold only for substantive indicators
     # Do NOT treat mere "evidence_missing" as a risk that triggers flooring.
     try:
