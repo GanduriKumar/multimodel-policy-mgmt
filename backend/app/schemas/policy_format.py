@@ -72,3 +72,55 @@ class PolicyDoc(BaseModel):
         default=True,
         description="When enabled, any risk indicators trigger denial even if risk score is below threshold.",
     )
+
+    # ===============================
+    # REGULATORY COMPLIANCE FIELDS
+    # ===============================
+
+    # Regulatory frameworks this policy adheres to
+    regulatory_frameworks: list[str] = Field(
+        default_factory=list,
+        description="Selected regulatory frameworks (e.g., ['eu_ai_act_high_risk', 'nist_ai_rmf', 'nist_privacy'])",
+    )
+
+    # EU AI Act configuration for high-risk AI systems
+    eu_ai_act_config: dict = Field(
+        default_factory=dict,
+        description="EU AI Act Articles 9-15 compliance configuration",
+    )
+
+    # NIST AI Risk Management Framework configuration
+    nist_ai_rmf_config: dict = Field(
+        default_factory=dict,
+        description="NIST AI RMF four core functions (Govern, Map, Measure, Manage) configuration",
+    )
+
+    # NIST Privacy Framework configuration
+    nist_privacy_config: dict = Field(
+        default_factory=dict,
+        description="NIST Privacy Framework data lifecycle configuration",
+    )
+
+    # Compliance metadata and mappings
+    compliance_metadata: dict = Field(
+        default_factory=dict,
+        description="Compliance metadata including article/control mappings, validation status, auto-generated rule mappings",
+    )
+
+    # Human oversight requirement flag (auto-set based on compliance configs)
+    requires_human_review: bool = Field(
+        default=False,
+        description="Whether this policy requires human review for certain decisions (auto-set from compliance config)",
+    )
+
+    # Current compliance validation status
+    compliance_status: str = Field(
+        default="draft",
+        description="Compliance validation status: 'draft', 'validated', 'non_compliant'",
+    )
+
+    # Human oversight configuration
+    human_oversight_config: dict = Field(
+        default_factory=dict,
+        description="Configuration for human oversight triggers, SLA, and escalation procedures",
+    )

@@ -137,9 +137,22 @@ class SqlAlchemyAuditRepo:
         policy_id: Optional[int] = None,
         policy_version_id: Optional[int] = None,
         risk_score: Optional[int] = None,
+        # Enhanced compliance audit fields
+        reasoning_chain: Optional[dict] = None,
+        compliance_frameworks: Optional[list[str]] = None,
+        regulatory_mappings: Optional[dict] = None,
+        engine_scores: Optional[dict] = None,
+        policy_version_snapshot: Optional[dict] = None,
     ) -> DecisionLog:
         """
         Persist and return a DecisionLog entry linked to a RequestLog.
+        
+        Enhanced with compliance audit fields:
+        - reasoning_chain: Complete decision reasoning with rules evaluated, triggers, scores
+        - compliance_frameworks: Active regulatory frameworks for this decision
+        - regulatory_mappings: Specific articles/controls that governed decision
+        - engine_scores: Detailed scores from various evaluators
+        - policy_version_snapshot: Complete policy snapshot for auditability
         """
         dec = DecisionLog(
             tenant_id=tenant_id,
@@ -149,6 +162,12 @@ class SqlAlchemyAuditRepo:
             policy_id=policy_id,
             policy_version_id=policy_version_id,
             risk_score=risk_score,
+            # Enhanced compliance fields
+            reasoning_chain=reasoning_chain or {},
+            compliance_frameworks=compliance_frameworks or [],
+            regulatory_mappings=regulatory_mappings or {},
+            engine_scores=engine_scores or {},
+            policy_version_snapshot=policy_version_snapshot or {},
         )
         try:
             self.session.add(dec)
