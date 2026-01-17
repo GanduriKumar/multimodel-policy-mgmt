@@ -36,8 +36,11 @@ else:
 
         DATABASE_URL = get_settings().db_url
     except Exception:
-        # Safe final fallback
-        DATABASE_URL = "sqlite:///./app.db"
+        # Safe final fallback: always point to backend/app.db regardless of CWD
+        _here = os.path.dirname(__file__)
+        _backend_dir = os.path.abspath(os.path.join(_here, "..", ".."))
+        _db_path = os.path.join(_backend_dir, "app.db")
+        DATABASE_URL = f"sqlite:///{_db_path}"
 
 SQLALCHEMY_ECHO: bool = os.getenv("SQLALCHEMY_ECHO", "0").lower() in {"1", "true", "yes", "on"}
 
