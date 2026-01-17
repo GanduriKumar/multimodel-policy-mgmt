@@ -42,9 +42,27 @@ def _local_intent_classifier(text: str) -> Dict[str, float]:
         scores["weapon_instruction"] = 0.9
     elif any(k in text_l for k in ["how to make", "how to build"]) and any(k in text_l for k in ["bomb", "gun", "explosive", "detonator", "weapon"]):
         scores["weapon_instruction"] = max(scores.get("weapon_instruction", 0), 0.75)
-    # Incite violence heuristics
-    if any(k in text_l for k in ["kill them", "kill all", "attack them", "exterminate", "wipe out", "genocide", "harm them"]):
-        scores["incite_violence"] = 0.85
+    # Incite violence heuristics (expanded)
+    incite_phrases = [
+        "kill them",
+        "kill all",
+        "attack them",
+        "attack the city",
+        "bomb the city",
+        "drop a bomb",
+        "drop a nuclear bomb",
+        "wipe out",
+        "wipe out the",
+        "decimate the city",
+        "destroy the city",
+        "obliterate",
+        "annihilate",
+        "genocide",
+        "harm them",
+        "exterminate",
+    ]
+    if any(k in text_l for k in incite_phrases):
+        scores["incite_violence"] = max(scores.get("incite_violence", 0), 0.9)
     # Depiction (usually allowed)
     depiction_cues = [
         "murder mystery",
