@@ -40,6 +40,24 @@ function getApiBase(): string {
 const TENANT_ID = '1'; // hidden in UI; defaulted to 1 for on-prem
 const TZ = 'Asia/Kolkata';
 
+function dayBucket(iso?: string): { key: string; label: string } {
+  if (!iso) return { key: '', label: '' };
+  let s = String(iso);
+  const hasTZ = /Z$|[+-]\d{2}:\d{2}$/.test(s);
+  if (!hasTZ) {
+    s = s.replace(' ', 'T');
+    if (!/T/.test(s)) s = s + 'T00:00:00';
+    s = s + 'Z';
+  }
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return { key: '', label: '' };
+  // Key: ISO date in en-CA (YYYY-MM-DD) for stable sorting
+  const key = d.toLocaleDateString('en-CA', { timeZone: TZ });
+  // Label: en-IN normative format for display
+  const label = d.toLocaleDateString('en-IN', { timeZone: TZ });
+  return { key, label };
+}
+
 const Dashboard: React.FC = () => {
   // Live data state
   const [decisions, setDecisions] = useState<DecisionEvent[]>([]);
@@ -60,6 +78,7 @@ const Dashboard: React.FC = () => {
   const [decFormat, setDecFormat] = useState('html');
   const [decBusy, setDecBusy] = useState(false);
 
+
   // Chart refs
   const decisionsDayRef = useRef<HTMLCanvasElement | null>(null);
   const decisionsPolRef = useRef<HTMLCanvasElement | null>(null);
@@ -68,16 +87,20 @@ const Dashboard: React.FC = () => {
   // Aggregations
   const decByDay = useMemo(() => {
     const map: Record<string, { allow: number; deny: number }> = {};
+    const labelMap: Record<string, string> = {};
     for (const d of decisions) {
-      const day = (d.decided_at_local || '').split('T')[0] || (d.decided_at_utc || '').split('T')[0];
-      if (!map[day]) map[day] = { allow: 0, deny: 0 };
-      if (d.allowed) map[day].allow += 1; else map[day].deny += 1;
+      const b = dayBucket(d.decided_at_local || d.decided_at_utc);
+      if (!b.key) continue;
+      if (!map[b.key]) map[b.key] = { allow: 0, deny: 0 };
+      labelMap[b.key] = b.label;
+      if (d.allowed) map[b.key].allow += 1; else map[b.key].deny += 1;
     }
-    const labels = Object.keys(map).sort();
+    const keys = Object.keys(map).sort();
+    const labels = keys.map(k => labelMap[k] || k);
     return {
       labels,
-      allow: labels.map(l => map[l].allow),
-      deny: labels.map(l => map[l].deny),
+      allow: keys.map(k => map[k].allow),
+      deny: keys.map(k => map[k].deny),
     };
   }, [decisions]);
 
@@ -101,23 +124,29 @@ const Dashboard: React.FC = () => {
 
   const changesByType = useMemo(() => {
     const map: Record<string, Record<string, number>> = {};
+    const labelMap: Record<string, string> = {};
     for (const c of changes) {
-      const day = (c.changed_at_local || '').split('T')[0] || (c.changed_at_utc || '').split('T')[0];
-      map[day] = map[day] || {};
-      map[day][c.change_type] = (map[day][c.change_type] || 0) + 1;
+      const b = dayBucket(c.changed_at_local || c.changed_at_utc);
+      if (!b.key) continue;
+      labelMap[b.key] = b.label;
+      map[b.key] = map[b.key] || {};
+      map[b.key][c.change_type] = (map[b.key][c.change_type] || 0) + 1;
     }
-    const labels = Object.keys(map).sort();
+    const keys = Object.keys(map).sort();
+    const labels = keys.map(k => labelMap[k] || k);
     const typesSet = new Set<string>();
-    for (const day of labels) for (const t of Object.keys(map[day])) typesSet.add(t);
+    for (const k of keys) for (const t of Object.keys(map[k])) typesSet.add(t);
     const types = Array.from(typesSet).sort();
     const datasets = types.map((t, i) => ({
       label: t,
-      data: labels.map(l => map[l][t] || 0),
+      data: keys.map(k => map[k][t] || 0),
       backgroundColor: COLORS[i % COLORS.length],
       stack: 'changes',
     }));
     return { labels, datasets };
   }, [changes]);
+
+  
 
   // Totals
   const totals = useMemo(() => {
@@ -572,5 +601,7 @@ function percent(value: number, total: number): string {
   const p = (value / total) * 100;
   return `${p.toFixed(1)}%`;
 }
+
+ 
 
 export default Dashboard;

@@ -58,6 +58,7 @@ class SqlAlchemyAuditRepo:
     ) -> RequestLog:
         """
         Persist and return a RequestLog entry. Computes input_hash if not provided.
+        Note: Same input text can be logged multiple times (e.g., when policy changes).
         """
         if not isinstance(tenant_id, int):
             raise TypeError("tenant_id must be an int")
@@ -83,18 +84,8 @@ class SqlAlchemyAuditRepo:
             self.session.refresh(req)
             return req
         except IntegrityError as ie:
-            # Handle de-duplication collisions gracefully: return the existing row
+            # Handle collision on (tenant_id, request_id) if a duplicate client request_id is provided
             self.session.rollback()
-            # Prefer lookup by (tenant_id, input_hash) when available
-            if ihash:
-                stmt = select(RequestLog).where(
-                    RequestLog.tenant_id == tenant_id,
-                    RequestLog.input_hash == ihash,
-                )
-                existing = self.session.execute(stmt).scalars().first()
-                if existing is not None:
-                    return existing
-            # Fallback: lookup by (tenant_id, request_id) if provided
             if request_id:
                 stmt = select(RequestLog).where(
                     RequestLog.tenant_id == tenant_id,

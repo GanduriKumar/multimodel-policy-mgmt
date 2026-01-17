@@ -31,8 +31,6 @@ class RequestLog(Base):
 
     __tablename__ = "request_log"
     __table_args__ = (
-        # Optional de-duplication within tenant by input_hash if provided
-        UniqueConstraint("tenant_id", "input_hash", name="uq_request_tenant_input_hash"),
         # Optional uniqueness for a client-provided request identifier within a tenant
         UniqueConstraint("tenant_id", "request_id", name="uq_request_tenant_request_id"),
         Index("ix_request_tenant_created", "tenant_id", "created_at"),

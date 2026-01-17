@@ -13,6 +13,8 @@ const AuditPage: React.FC = () => {
   const [tenantId] = useState<number>(1);
   const [offset, setOffset] = useState<number>(0);
   const [limit, setLimit] = useState<number>(20);
+  // Display timezone (match Dashboard default)
+  const TZ = 'Asia/Kolkata';
 
   // Detail control
   const [detailId, setDetailId] = useState<string>('');
@@ -66,8 +68,23 @@ const AuditPage: React.FC = () => {
   const fmt = (iso?: string) => {
     if (!iso) return '—';
     try {
-      const d = new Date(iso);
-      return isNaN(d.getTime()) ? iso : d.toLocaleString();
+      // Normalize to ISO; if timezone is missing, assume UTC
+      let s = String(iso);
+      const hasTZ = /Z$|[+-]\d{2}:\d{2}$/.test(s);
+      if (!hasTZ) {
+        // Replace space with 'T' if present for strict ISO, then append Z
+        s = s.replace(' ', 'T');
+        if (!/T/.test(s)) s = s + 'T00:00:00';
+        s = s + 'Z';
+      }
+      const d = new Date(s);
+      if (isNaN(d.getTime())) return iso;
+      // Use en-IN normative date format and explicit timezone
+      return d.toLocaleString('en-IN', {
+        timeZone: TZ,
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+      });
     } catch {
       return iso;
     }
@@ -86,7 +103,10 @@ const AuditPage: React.FC = () => {
     <div className="container py-4">
       <div className="d-flex align-items-center justify-content-between mb-3">
         <h1 className="mb-0">Audit</h1>
-        <a className="btn btn-outline-secondary" href="/">Home</a>
+        <div className="d-flex align-items-center gap-2">
+          <span className="badge bg-secondary">Timezone: {TZ}</span>
+          <a className="btn btn-outline-secondary" href="/">Home</a>
+        </div>
       </div>
 
       <section className="mb-4">

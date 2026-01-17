@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import usePolicies, { type PolicyOut, type PolicyVersionOut, type CreatePolicyPayload } from '../hooks/usePolicies';
-import useReports, { type ComplianceFramework, type ReportFormat } from '../hooks/useReports';
 
 const Policies: React.FC = () => {
   const { items, total, loading, error, listPolicies, createPolicy, addVersion, activateVersion, getActiveVersion, listVersions, deletePolicy, resetError } = usePolicies();
@@ -22,12 +21,8 @@ const Policies: React.FC = () => {
     busy: boolean;
     error: string | null;
     lastVersion?: PolicyVersionOut | null;
-    reportFramework?: ComplianceFramework;
-    reportFormat?: ReportFormat;
-    reportBusy?: boolean;
   };
   const [rowState, setRowState] = useState<Record<number, RowState>>({});
-  const { downloadComplianceReport } = useReports();
   const [selectedJson, setSelectedJson] = useState<{
     policyId: number;
     jsonText: string;
@@ -71,9 +66,6 @@ const Policies: React.FC = () => {
         busy: false,
         error: null,
         lastVersion: undefined,
-        reportFramework: 'eu-ai-act',
-        reportFormat: 'json',
-        reportBusy: false,
       },
     [rowState]
   );
@@ -310,7 +302,32 @@ const Policies: React.FC = () => {
     if (!iso) return '—';
     try {
       const d = new Date(iso);
-      return isNaN(d.getTime()) ? iso : d.toLocaleString();
+      return isNaN(d.getTime()) ? iso : d.toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+      });
+    } catch {
+      return iso;
+    }
+  };
+
+  const fmtInTZ = (iso?: string, tz?: string) => {
+    if (!iso) return '—';
+    const TZ = tz || 'Asia/Kolkata';
+    try {
+      let s = String(iso);
+      const hasTZ = /Z$|[+-]\d{2}:\d{2}$/.test(s);
+      if (!hasTZ) {
+        s = s.replace(' ', 'T');
+        if (!/T/.test(s)) s = s + 'T00:00:00';
+        s = s + 'Z';
+      }
+      const d = new Date(s);
+      if (isNaN(d.getTime())) return iso;
+      return d.toLocaleString('en-IN', {
+        timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+      });
     } catch {
       return iso;
     }
@@ -320,7 +337,10 @@ const Policies: React.FC = () => {
     <div className="container py-4">
       <div className="d-flex align-items-center justify-content-between mb-3">
         <h1 className="mb-0">Policies</h1>
-        <a className="btn btn-outline-secondary" href="/">Home</a>
+        <div className="d-flex align-items-center gap-2">
+          <span className="badge bg-secondary">Timezone: Asia/Kolkata</span>
+          <a className="btn btn-outline-secondary" href="/">Home</a>
+        </div>
       </div>
 
       {/* Load policies (tenant hidden) */}
@@ -542,7 +562,7 @@ const Policies: React.FC = () => {
                             )
                           : '—'}
                       </td>
-                      <td>{fmt(p.created_at)}</td>
+                      <td>{fmtInTZ(p.created_at, 'Asia/Kolkata')}</td>
                       <td>
                         <div className="row g-2">
                           <div className="col-7">
@@ -637,40 +657,7 @@ const Policies: React.FC = () => {
                         >
                           View
                         </button>
-                        <div className="dropdown">
-                          <button className="btn btn-sm btn-outline-dark dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            Regulatory report
-                          </button>
-                          <ul className="dropdown-menu">
-                            {(['eu-ai-act','nist-ai-rmf','nist-privacy'] as ComplianceFramework[]).map((fw) => (
-                              <React.Fragment key={fw}>
-                                <li className="dropdown-header">{fw.toUpperCase()}</li>
-                                {(['json','csv','html'] as ReportFormat[]).map((fmt) => (
-                                  <li key={`${fw}-${fmt}`}>
-                                    <button
-                                      className="dropdown-item"
-                                      onClick={async () => {
-                                        setRow(p.id, { reportBusy: true, reportFramework: fw, reportFormat: fmt });
-                                        try {
-                                          await downloadComplianceReport(p.id, fw, 1, fmt);
-                                        } catch (e: any) {
-                                          alert(e?.message ?? 'Failed to download');
-                                        } finally {
-                                          setRow(p.id, { reportBusy: false });
-                                        }
-                                      }}
-                                    >
-                                      {rs.reportBusy && rs.reportFramework === fw && rs.reportFormat === fmt 
-                                        ? 'Downloading…' 
-                                        : `${fmt.toUpperCase()}`}
-                                    </button>
-                                  </li>
-                                ))}
-                                <li><hr className="dropdown-divider" /></li>
-                              </React.Fragment>
-                            ))}
-                          </ul>
-                        </div>
+                        {/* Regulatory report dropdown removed as requested */}
                       </td>
                     </tr>
                   );

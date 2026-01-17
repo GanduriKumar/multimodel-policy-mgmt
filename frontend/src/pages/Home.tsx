@@ -6,6 +6,7 @@ const Home: React.FC = () => {
   const [activeVersions, setActiveVersions] = useState<Record<number, PolicyVersionOut | null>>({});
 
   const [tenantId, setTenantId] = useState<number>(1);
+  const TZ = 'Asia/Kolkata';
 
   const onLoad = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,11 +39,23 @@ const Home: React.FC = () => {
     })();
   }, [items]);
 
-  const fmt = (iso?: string) => {
+  const fmtInTZ = (iso?: string, tz?: string) => {
     if (!iso) return '—';
+    const tzUse = tz || TZ;
     try {
-      const d = new Date(iso);
-      return isNaN(d.getTime()) ? iso : d.toLocaleString();
+      let s = String(iso);
+      const hasTZ = /Z$|[+-]\d{2}:\d{2}$/.test(s);
+      if (!hasTZ) {
+        s = s.replace(' ', 'T');
+        if (!/T/.test(s)) s = s + 'T00:00:00';
+        s = s + 'Z';
+      }
+      const d = new Date(s);
+      if (isNaN(d.getTime())) return iso;
+      return d.toLocaleString('en-IN', {
+        timeZone: tzUse, year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+      });
     } catch {
       return iso;
     }
@@ -50,10 +63,11 @@ const Home: React.FC = () => {
 
   return (
     <div className="container py-4">
-      <header className="mb-4">
+      <header className="mb-4 d-flex align-items-center justify-content-between">
         <p className="text-muted mb-0 fs-5">
           Multimodel Policy Management: evaluate content against policies and risk engines, manage evidence, and audit decisions.
         </p>
+        <span className="badge bg-secondary">Timezone: {TZ}</span>
       </header>
 
       <nav className="mb-4">
@@ -115,7 +129,7 @@ const Home: React.FC = () => {
                         <span className="badge bg-secondary">inactive</span>
                       )}
                     </td>
-                    <td>{fmt(p.created_at)}</td>
+                    <td>{fmtInTZ(p.created_at, TZ)}</td>
                   </tr>
                 )})}
               </tbody>
