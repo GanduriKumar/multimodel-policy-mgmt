@@ -39,7 +39,11 @@ else:
 
 # Create a version with comprehensive compliance configurations
 policy_doc = {
-    'blocked_terms': ['weapon', 'violence', 'hack'],
+    'blocked_terms': [
+        'weapon', 'violence', 'hack', 'murder', 'kill', 'assassination', 
+        'assassinate', 'eliminate', 'execution', 'slaughter', 'massacre',
+        'bomb', 'explosive', 'terrorist', 'terrorism'
+    ],
     'allowed_sources': ['trusted.com', 'verified.org'],
     'risk_threshold': 70,
     'conservative_mode': True,
