@@ -165,7 +165,18 @@ def main() -> int:
         part = part.strip()
         if part.isdigit():
             ev_ids.append(int(part))
-    meta: Optional[Dict[str, Any]] = {"evidence_ids": ev_ids} if ev_ids else None
+    
+    # Generate a unique correlation ID for this conversation flow
+    import uuid
+    import time
+    correlation_id = f"sample-app-{int(time.time())}-{uuid.uuid4().hex[:8]}"
+    
+    meta: Optional[Dict[str, Any]] = {
+        "correlation_id": correlation_id,
+        "stage": "pre",
+    }
+    if ev_ids:
+        meta["evidence_ids"] = ev_ids
 
     # Pre-check
     try:
@@ -201,6 +212,13 @@ def main() -> int:
         return 11
 
     # Post-check
+    meta_post = {
+        "correlation_id": correlation_id,
+        "stage": "post",
+    }
+    if ev_ids:
+        meta_post["evidence_ids"] = ev_ids
+        
     try:
         post = protect(
             backend_url=args.backend_url,
@@ -208,7 +226,7 @@ def main() -> int:
             policy_id=args.policy_id,
             text=draft,
             evidence_types=ev_types,
-            metadata=meta,
+            metadata=meta_post,
             api_key=args.backend_api_key,
             api_key_header=args.backend_api_key_header,
         )

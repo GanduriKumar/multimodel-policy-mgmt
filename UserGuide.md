@@ -400,6 +400,410 @@ Evidence ingestion is available via the API today. Use the curl examples above t
 
 Tip: When evaluating in Protect, type the matching tags into "Evidence Types (CSV)" (e.g., url,document). This signals to the policy engine that the required kinds of evidence are present.
 
+---
+
+## Step 4B: Advanced Policy Configuration (For Regulatory Compliance)
+
+So far, we've created simple policies with basic rules like blocked terms and risk thresholds. But what if you need to meet regulatory requirements like the EU AI Act, NIST AI Risk Management Framework, or privacy regulations?
+
+This section shows you how to configure **comprehensive policies** that help your organization stay compliant. Don't worry—we'll explain everything in simple terms!
+
+### Why Regulatory Compliance Configuration Matters
+
+Think of it this way:
+- **Basic policy** = A simple checklist ("Don't say bad words")
+- **Compliance-ready policy** = A complete audit trail ("Here's how we tested our AI, what data we use, how we protect privacy, and who's responsible")
+
+When regulators or auditors ask questions like "How do you ensure your AI is safe?" or "What personal data does your system process?", you'll have documented answers.
+
+### What You're Configuring
+
+When you create an advanced policy, you'll fill in information across four main areas:
+
+1. **EU AI Act Configuration**: Requirements for AI systems used in the European Union
+2. **NIST AI Risk Management Framework**: Best practices for identifying and managing AI risks
+3. **NIST Privacy Framework**: How you protect personal information
+4. **PII (Personal Information) Rules**: Automatically detect and protect sensitive data like emails, phone numbers, and credit cards
+
+### How to Create an Advanced Policy
+
+There are two ways to create a comprehensive policy:
+
+#### Option 1: Using the Sample Script (Easiest!)
+
+We've created a ready-to-use script that sets up a complete compliance-ready policy:
+
+```bash
+# Make sure you're in the backend folder
+cd backend
+
+# Activate your Python environment
+# Windows: .\.venv\Scripts\Activate.ps1
+# macOS/Linux: source .venv/bin/activate
+
+# Run the script
+python create_sample_policy.py
+```
+
+This creates a policy (ID=1, Version=2) with **all** compliance fields already filled in. You can then customize it through the API or by editing the script.
+
+#### Option 2: Creating via API (For Custom Policies)
+
+If you want to create your own policy from scratch, use the `/api/policies/{policy_id}/versions` endpoint. Below, we'll explain each section so you know what to include.
+
+### Understanding PII Rules
+
+**What is PII?** PII stands for "Personally Identifiable Information"—things like:
+- Email addresses (test@example.com)
+- Social Security Numbers (123-45-6789)
+- Credit card numbers
+- Phone numbers
+
+**Why configure PII rules?** You can automatically protect this sensitive information by:
+- **Blocking** the request entirely if PII is detected
+- **Masking** the PII (turn "test@example.com" into "t***@example.com")
+- **Redacting** the PII (remove it completely)
+
+**Example PII Rules Configuration:**
+
+```json
+{
+  "pii_rules": {
+    "email": {
+      "action": "mask",
+      "enabled": true,
+      "description": "Email addresses are masked (partially hidden)"
+    },
+    "ssn": {
+      "action": "block",
+      "enabled": true,
+      "description": "Social Security Numbers completely block the request"
+    },
+    "credit_card": {
+      "action": "block",
+      "enabled": true,
+      "description": "Credit card numbers completely block the request"
+    },
+    "phone": {
+      "action": "mask",
+      "enabled": true,
+      "description": "Phone numbers are masked"
+    }
+  }
+}
+```
+
+**What this means in plain English:**
+- If someone types "My email is john@example.com", the system will mask it to "My email is j***@example.com"
+- If someone types "My SSN is 123-45-6789", the request is **blocked** immediately for security
+- You stay in control: enable/disable rules or change actions as needed
+
+### Understanding EU AI Act Configuration
+
+The EU AI Act requires organizations using AI in Europe to document how their systems work and ensure they're safe. Here's what you need to configure:
+
+**1. Risk Management System**
+*What it is:* How you identify and reduce risks in your AI system.
+*Example:* "We test our AI monthly, review decisions quarterly, and maintain a risk register."
+
+**2. Data Quality Measures**
+*What it is:* How you ensure the data you use is accurate and appropriate.
+*Example:* "We validate training data for accuracy, remove duplicates, and check for bias monthly."
+
+**3. Technical Documentation**
+*What it is:* A description of how your AI system works.
+*Example:* "GPT-4-based chatbot for customer support; uses company knowledge base; filters harmful content."
+
+**4. Record-Keeping Practices**
+*What it is:* How you log and store AI decisions for auditing.
+*Example:* "All decisions logged to secure database; retained for 3 years; accessible to compliance team."
+
+**5. Transparency Measures**
+*What it is:* How you inform users they're interacting with AI.
+*Example:* "Chat interface displays 'AI Assistant' badge; users can request human agent anytime."
+
+**6. Human Oversight Mechanisms**
+*What it is:* How humans monitor and can override the AI.
+*Example:* "Support manager reviews flagged decisions daily; emergency stop button available."
+
+**7. Accuracy and Robustness Testing**
+*What it is:* How you test that your AI works correctly and handles errors gracefully.
+*Example:* "Monthly accuracy tests against 1000 sample queries; 95% accuracy threshold; error handling for network failures."
+
+**Example EU AI Act Configuration:**
+
+```json
+{
+  "eu_ai_act_config": {
+    "risk_management_system": "Quarterly risk assessments; incident tracking; monthly policy reviews",
+    "data_quality_measures": "Data validation pipelines; bias detection; monthly quality audits",
+    "technical_documentation": "GPT-4 chatbot with RAG; content filtering; evidence-based responses",
+    "record_keeping_practices": "All decisions logged with tamper-evident hashing; 3-year retention",
+    "transparency_measures": "AI disclosure badges; user notification; opt-out available",
+    "human_oversight_mechanisms": "Daily review queue; escalation paths; emergency stop procedures",
+    "accuracy_robustness_testing": "Monthly accuracy tests (95% threshold); error handling; fallback mechanisms"
+  }
+}
+```
+
+### Understanding NIST AI Risk Management Framework
+
+The NIST AI RMF organizes AI risk management into four functions: **GOVERN**, **MAP**, **MEASURE**, and **MANAGE**. Here's what each means:
+
+**GOVERN Function** (Who's in charge and what are the rules?)
+
+1. **Governance Structures**: Who makes decisions about AI safety?
+   - *Example:* "AI Safety Board meets monthly; CTO has final approval; documented in AI charter"
+
+2. **Risk Management Policies**: What are your organization's AI risk policies?
+   - *Example:* "Zero tolerance for bias; monthly risk reviews; escalation for high-risk decisions"
+
+3. **Accountability Mechanisms**: Who's responsible when something goes wrong?
+   - *Example:* "VP of Engineering accountable for AI safety; incident response team on call 24/7"
+
+**MAP Function** (Understanding your AI system and its context)
+
+1. **System Context Documentation**: Where and how is the AI used?
+   - *Example:* "Customer support chat; processes 10K queries/day; integrates with CRM"
+
+2. **Risk Identification Process**: How do you find potential risks?
+   - *Example:* "Monthly threat modeling; user feedback analysis; incident reviews"
+
+3. **Impact Assessment**: What could go wrong and how bad would it be?
+   - *Example:* "Low impact: unhelpful response; High impact: biased decision; Critical: data leak"
+
+**MEASURE Function** (How do you know it's working?)
+
+1. **Performance Metrics**: What numbers tell you the AI is doing well?
+   - *Example:* "95% accuracy; <2% harmful content; <1% PII leaks; 98% user satisfaction"
+
+2. **Testing Validation Methods**: How do you test the AI?
+   - *Example:* "1000-query test suite monthly; red team testing quarterly; A/B testing for changes"
+
+3. **Monitoring Continuous Assessment**: How do you keep watching it?
+   - *Example:* "Real-time dashboards; daily reports; alerts for anomalies; weekly team reviews"
+
+**MANAGE Function** (What do you do about risks?)
+
+1. **Risk Response Plans**: What's your plan when you find a risk?
+   - *Example:* "Low risk: Log and review; Medium: Immediate investigation; High: Disable feature"
+
+2. **Incident Management**: What happens when something goes wrong?
+   - *Example:* "24/7 on-call; incident playbooks; post-mortem required; user notification protocols"
+
+3. **Continuous Improvement**: How do you get better over time?
+   - *Example:* "Monthly retrospectives; policy updates based on incidents; quarterly training for team"
+
+**Example NIST AI RMF Configuration:**
+
+```json
+{
+  "nist_ai_rmf_config": {
+    "governance_structures": "AI Safety Board (monthly); CTO approval required; documented charter",
+    "risk_management_policies": "Zero-tolerance for bias; monthly risk reviews; high-risk escalation",
+    "accountability_mechanisms": "VP Engineering accountable; 24/7 incident response; clear escalation paths",
+    "system_context_documentation": "Customer support chatbot; 10K queries/day; CRM integration",
+    "risk_identification_process": "Monthly threat modeling; user feedback analysis; incident post-mortems",
+    "impact_assessment": "Low: unhelpful response; High: biased decision; Critical: data breach",
+    "performance_metrics": "95% accuracy; <2% harmful content; <1% PII leaks; 98% satisfaction",
+    "testing_validation_methods": "1K-query test suite monthly; quarterly red team; A/B testing",
+    "monitoring_continuous_assessment": "Real-time dashboards; daily reports; anomaly alerts; weekly reviews",
+    "risk_response_plans": "Low: log; Medium: investigate; High: disable; Critical: full shutdown",
+    "incident_management": "24/7 on-call; playbooks ready; post-mortems required; user notifications",
+    "continuous_improvement": "Monthly retros; policy updates; quarterly team training; feedback loops"
+  }
+}
+```
+
+### Understanding NIST Privacy Framework
+
+The NIST Privacy Framework helps you protect personal information. It's organized into five functions:
+
+**IDENTIFY-P** (What personal data do you handle?)
+
+1. **Data Processing Inventory**: What personal data does your system use?
+   - *Example:*
+     ```json
+     {
+       "data_types": ["email", "name", "chat_history"],
+       "purposes": ["customer support", "analytics"],
+       "retention": "3 years"
+     }
+     ```
+
+2. **Privacy Governance Policies**: What are your privacy rules?
+   - *Example:* "GDPR compliant; data minimization; user consent required; privacy-by-design"
+
+3. **Risk Assessment Process**: How do you find privacy risks?
+   - *Example:* "Quarterly privacy impact assessments; automated PII scanning; user rights reviews"
+
+**GOVERN-P** (Who manages privacy?)
+
+1. **Privacy Oversight Roles**: Who's in charge of privacy?
+   - *Example:* "Data Protection Officer (DPO); Privacy team; quarterly board reports"
+
+2. **Compliance Frameworks**: What privacy laws do you follow?
+   - *Example:* "GDPR (EU); CCPA (California); HIPAA (healthcare); regular compliance audits"
+
+**CONTROL-P** (How do you protect the data?)
+
+1. **Data Minimization Practices**: Do you only collect what you need?
+   - *Example:* "Only collect email for support tickets; automatic chat deletion after 90 days"
+
+2. **Access Controls**: Who can see personal data?
+   - *Example:* "Role-based access; encrypted at rest; audit logs; annual access reviews"
+
+3. **PII Protection Mechanisms**: How do you keep personal data safe?
+   - *Example:* "AES-256 encryption; automatic masking; PII detection in queries; secure deletion"
+
+**PROTECT-P** (Preventing privacy problems)
+
+1. **Data Security Measures**: How do you prevent data breaches?
+   - *Example:* "End-to-end encryption; regular pen testing; intrusion detection; backups encrypted"
+
+2. **Breach Response Plans**: What happens if data leaks?
+   - *Example:* "72-hour notification; incident response team; user notification; regulatory reporting"
+
+**RESPOND-P** (Handling privacy incidents)
+
+1. **Incident Management Procedures**: What's your privacy incident plan?
+   - *Example:* "24/7 hotline; investigation within 24h; containment procedures; affected user notification"
+
+**Example NIST Privacy Configuration:**
+
+```json
+{
+  "nist_privacy_config": {
+    "data_processing_inventory": {
+      "data_types": ["email", "name", "chat_history", "session_data"],
+      "purposes": ["customer_support", "quality_improvement", "compliance"],
+      "retention": "3 years for audit; then secure deletion"
+    },
+    "privacy_governance_policies": "GDPR compliant; data minimization; explicit consent; privacy-by-design",
+    "privacy_risk_assessment": "Quarterly PIAs; automated PII detection; user rights impact analysis",
+    "privacy_oversight_roles": "Data Protection Officer; Privacy Team; quarterly board reviews",
+    "compliance_frameworks": "GDPR (EU); CCPA (California); annual compliance audits",
+    "data_minimization_practices": "Collect only necessary data; 90-day auto-delete for chat; no tracking",
+    "access_controls": "Role-based access; encrypted at rest/transit; annual access reviews; audit logs",
+    "pii_protection_mechanisms": "AES-256 encryption; automatic PII masking; detection in queries; secure deletion",
+    "data_security_measures": "End-to-end encryption; quarterly pen tests; IDS/IPS; encrypted backups",
+    "breach_response_plans": "72h GDPR notification; incident response team; user alerts; regulatory filings",
+    "incident_management_procedures": "24/7 hotline; 24h investigation SLA; containment playbooks; user notification"
+  }
+}
+```
+
+### Putting It All Together: Complete Policy Example
+
+Here's what a full compliance-ready policy looks like when you send it to the API:
+
+```json
+{
+  "policy_id": 1,
+  "version": 2,
+  "document": {
+    "description": "Comprehensive compliance-ready policy",
+    "blocked_terms": ["weapon", "violence", "illegal"],
+    "risk_threshold": 75,
+    "required_evidence_types": ["url", "document"],
+    
+    "pii_rules": {
+      "email": {"action": "mask", "enabled": true},
+      "ssn": {"action": "block", "enabled": true},
+      "credit_card": {"action": "block", "enabled": true},
+      "phone": {"action": "mask", "enabled": true}
+    },
+    
+    "eu_ai_act_config": {
+      "risk_management_system": "Quarterly risk assessments with documented mitigation strategies",
+      "data_quality_measures": "Automated data validation and monthly bias audits",
+      "technical_documentation": "GPT-4 with content filtering and evidence-based retrieval",
+      "record_keeping_practices": "Tamper-evident logging with 3-year retention",
+      "transparency_measures": "Clear AI disclosure and user notification",
+      "human_oversight_mechanisms": "Daily review queue with escalation procedures",
+      "accuracy_robustness_testing": "Monthly accuracy tests with 95% threshold"
+    },
+    
+    "nist_ai_rmf_config": {
+      "governance_structures": "AI Safety Board with monthly meetings",
+      "risk_management_policies": "Zero-tolerance for bias; documented escalation",
+      "accountability_mechanisms": "VP Engineering accountable; 24/7 response",
+      "system_context_documentation": "Customer support chatbot processing 10K queries/day",
+      "risk_identification_process": "Monthly threat modeling and user feedback analysis",
+      "impact_assessment": "Tiered impact levels from low to critical",
+      "performance_metrics": "95% accuracy, <2% harmful content, 98% satisfaction",
+      "testing_validation_methods": "1K-query test suite monthly, quarterly red team",
+      "monitoring_continuous_assessment": "Real-time dashboards with anomaly detection",
+      "risk_response_plans": "Tiered response from logging to full shutdown",
+      "incident_management": "24/7 on-call with documented playbooks",
+      "continuous_improvement": "Monthly retrospectives and quarterly training"
+    },
+    
+    "nist_privacy_config": {
+      "data_processing_inventory": {
+        "data_types": ["email", "name", "chat_history"],
+        "purposes": ["customer_support", "quality_improvement"],
+        "retention": "3 years then secure deletion"
+      },
+      "privacy_governance_policies": "GDPR compliant with data minimization",
+      "privacy_risk_assessment": "Quarterly privacy impact assessments",
+      "privacy_oversight_roles": "Data Protection Officer with board reporting",
+      "compliance_frameworks": "GDPR, CCPA with annual audits",
+      "data_minimization_practices": "90-day auto-delete for non-essential data",
+      "access_controls": "Role-based access with annual reviews",
+      "pii_protection_mechanisms": "AES-256 encryption and automatic masking",
+      "data_security_measures": "End-to-end encryption with quarterly pen tests",
+      "breach_response_plans": "72-hour notification with incident response team",
+      "incident_management_procedures": "24/7 hotline with 24-hour investigation SLA"
+    }
+  }
+}
+```
+
+### Testing Your Compliance-Ready Policy
+
+After creating your advanced policy, test it to ensure PII protection works:
+
+```bash
+curl -X POST "http://localhost:8000/api/protect" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tenant_id": 1,
+    "policy_id": 1,
+    "input_text": "My email is test@example.com and my SSN is 123-45-6789",
+    "evidence_types": []
+  }'
+```
+
+**Expected result:** The request should be **BLOCKED** because SSN detection is enabled with action "block".
+
+### Generating Compliance Reports
+
+Once your policy is configured, you can generate compliance reports:
+
+```bash
+# Generate EU AI Act compliance report
+curl "http://localhost:8000/api/reports/regulatory/eu-ai-act?tenant_id=1&start_date=2024-01-01&format=html" > eu_compliance.html
+
+# Generate NIST AI RMF report
+curl "http://localhost:8000/api/reports/regulatory/nist-ai-rmf?tenant_id=1&start_date=2024-01-01&format=html" > nist_rmf.html
+
+# Generate NIST Privacy report
+curl "http://localhost:8000/api/reports/regulatory/nist-privacy?tenant_id=1&start_date=2024-01-01&format=html" > nist_privacy.html
+```
+
+Open the HTML files in your browser to see your compliance scores and detailed assessments.
+
+### Tips for Maintaining Compliance
+
+1. **Start with the sample policy**: Run `python create_sample_policy.py` to get a working template
+2. **Customize gradually**: Don't try to fill everything at once; start with what's most relevant to your organization
+3. **Review quarterly**: Set calendar reminders to update your documentation every 3 months
+4. **Test regularly**: Run compliance reports monthly to catch gaps early
+5. **Document everything**: The more detail you provide, the better your compliance scores
+
+---
+
 ### Link Evidence with Policies
 
 Linking helps audits and reporting. There are two ways:

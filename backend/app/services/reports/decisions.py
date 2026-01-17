@@ -159,13 +159,29 @@ def list_decision_events(
             .all()
         )
     except sqlalchemy.exc.OperationalError as e:
-        # Handle legacy databases that don't have the enhanced column `reasoning_chain`.
+        # Handle legacy databases that don't have the enhanced compliance audit columns
         msg = str(e).lower()
-        if "reasoning_chain" in msg or "no such column: decision_log.reasoning_chain" in msg:
-            # Add the missing column (SQLite supports ALTER TABLE ADD COLUMN)
-            conn = session.get_bind()
+        if "reasoning_chain" in msg or "compliance_frameworks" in msg or "regulatory_mappings" in msg or \
+           "engine_scores" in msg or "policy_version_snapshot" in msg or "no such column" in msg:
+            # Add all missing enhanced compliance columns (SQLite supports ALTER TABLE ADD COLUMN)
+            engine = session.get_bind()
             try:
-                conn.execute(text('ALTER TABLE decision_log ADD COLUMN reasoning_chain JSON'))
+                with engine.connect() as conn:
+                    # Try to add each column - ignore errors if column already exists
+                    columns_to_add = [
+                        'ALTER TABLE decision_log ADD COLUMN reasoning_chain JSON',
+                        'ALTER TABLE decision_log ADD COLUMN compliance_frameworks JSON',
+                        'ALTER TABLE decision_log ADD COLUMN regulatory_mappings JSON',
+                        'ALTER TABLE decision_log ADD COLUMN engine_scores JSON',
+                        'ALTER TABLE decision_log ADD COLUMN policy_version_snapshot JSON',
+                    ]
+                    for alter_stmt in columns_to_add:
+                        try:
+                            conn.execute(text(alter_stmt))
+                        except sqlalchemy.exc.OperationalError:
+                            # Column might already exist, continue
+                            pass
+                    conn.commit()
             except Exception:
                 # If we can't alter the table here, re-raise the original error to surface it.
                 raise

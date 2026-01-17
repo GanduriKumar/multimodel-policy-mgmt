@@ -7,6 +7,8 @@ export type AuditListRow = {
   decision_id?: number | null;
   decision?: boolean | null;
   risk_score?: number | null;
+  stage?: string | null;
+  input_text_preview?: string | null;
   created_at: string; // ISO date
 };
 
@@ -26,6 +28,9 @@ export type DecisionDetail = {
   policy_reasons: string[];
   risk_reasons: string[];
   evidence_ids: number[];
+  stage?: string | null;
+  input_text?: string | null;
+  correlation_id?: string | null;
   created_at: string;
 };
 

@@ -40,6 +40,8 @@ class AuditListRow(ORMBase):
     decision_id: Optional[int] = Field(default=None, ge=1, description="Associated decision identifier (if any)")
     decision: Optional[bool] = Field(default=None, description="Decision outcome if available")
     risk_score: Optional[int] = Field(default=None, ge=0, le=100, description="Risk score if available")
+    stage: Optional[str] = Field(default=None, description="Pre-check or post-check stage")
+    input_text_preview: Optional[str] = Field(default=None, description="First 100 chars of input text")
     created_at: datetime = Field(..., description="Request creation timestamp")
 
 
@@ -74,6 +76,11 @@ class DecisionDetail(ORMBase):
 
     # Evidence references associated with the request/decision
     evidence_ids: list[int] = Field(default_factory=list, description="Referenced evidence item IDs")
+
+    # Request context
+    stage: Optional[str] = Field(default=None, description="Pre-check or post-check stage")
+    input_text: Optional[str] = Field(default=None, description="Original input text that was evaluated")
+    correlation_id: Optional[str] = Field(default=None, description="Correlation ID for linking pre/post checks")
 
     # Timestamps
     created_at: datetime = Field(..., description="Decision creation timestamp")

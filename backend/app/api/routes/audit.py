@@ -29,12 +29,26 @@ def _to_row(item: Any, decision: Optional[Any]) -> AuditListRow:
     Convert RequestLog (and optional DecisionLog) to AuditListRow.
     Supports both Pydantic v1/v2 by creating the model from plain fields.
     """
+    # Extract stage from metadata
+    stage = None
+    input_text = getattr(item, "input_text", "")
+    input_text_preview = input_text[:100] if input_text else None
+    
+    try:
+        meta = getattr(item, "metadata_json", None)
+        if isinstance(meta, dict):
+            stage = meta.get("stage")
+    except Exception:
+        pass
+    
     return AuditListRow(
         request_log_id=getattr(item, "id"),
         tenant_id=getattr(item, "tenant_id"),
         decision_id=(getattr(decision, "id", None) if decision is not None else None),
         decision=(getattr(decision, "allowed", None) if decision is not None else None),
         risk_score=(getattr(decision, "risk_score", None) if decision is not None else None),
+        stage=stage,
+        input_text_preview=input_text_preview,
         created_at=getattr(item, "created_at"),
     )
 
@@ -110,16 +124,29 @@ def get_decision_detail(
     reasons = list(getattr(decision, "reasons", []) or [])
     policy_reasons, risk_reasons = _split_reasons(reasons)
 
-    # Extract evidence IDs from the originating request's metadata (if present)
+    # Extract evidence IDs and metadata from the originating request's metadata (if present)
     evidence_ids: list[int] = []
+    stage = None
+    correlation_id = None
+    input_text = None
+    
     try:
         req = None
         if hasattr(repo, "get_request"):
             req = getattr(repo, "get_request")(getattr(decision, "request_log_id"))  # type: ignore[attr-defined]
-        meta = getattr(req, "metadata_json", None) if req is not None else None
+        
+        if req is not None:
+            input_text = getattr(req, "input_text", None)
+            meta = getattr(req, "metadata_json", None)
+        else:
+            meta = None
+            
         raw_ids = None
         if isinstance(meta, dict):
             raw_ids = meta.get("evidence_ids")
+            stage = meta.get("stage")
+            correlation_id = meta.get("correlation_id")
+            
         if isinstance(raw_ids, str):
             # CSV string
             for part in raw_ids.split(','):
@@ -151,5 +178,8 @@ def get_decision_detail(
         policy_reasons=policy_reasons,
         risk_reasons=risk_reasons,
         evidence_ids=evidence_ids,
+        stage=stage,
+        input_text=input_text,
+        correlation_id=correlation_id,
         created_at=getattr(decision, "created_at"),
     )

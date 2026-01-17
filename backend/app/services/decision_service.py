@@ -27,6 +27,7 @@ from app.core.contracts import PolicyRepo, EvidenceRepo, AuditRepo
 from app.schemas.policy_format import PolicyDoc
 from app.services.policy_engine import evaluate_policy
 from app.services.risk_engine import compute_risk
+from app.core.patterns import detect_pii_like
 
 
 class ProtectResult(TypedDict):
@@ -178,6 +179,41 @@ def protect(
 
     # 3) Evaluate policy rules
     policy_allowed, policy_reasons = evaluate_policy(policy_doc, input_text, ev_types)
+    
+    # 3b) Enforce PII rules if configured
+    pii_blocked = False
+    pii_reasons = []
+    if policy_doc.pii_rules:
+        pii_markers = detect_pii_like(input_text)
+        if pii_markers:
+            # Check each PII marker against pii_rules configuration
+            for marker in pii_markers:
+                # Extract PII type from marker (e.g., "email_like" -> "email")
+                pii_type = marker.replace("_like", "").replace("_", "")
+                
+                # Check if this PII type has a rule configured
+                for rule_key, rule_config in policy_doc.pii_rules.items():
+                    if rule_key.lower() in pii_type.lower() or pii_type.lower() in rule_key.lower():
+                        if isinstance(rule_config, dict):
+                            action = rule_config.get('action', 'detect')
+                            enabled = rule_config.get('enabled', True)
+                        else:
+                            action = 'detect'
+                            enabled = True
+                        
+                        if enabled:
+                            if action == 'block':
+                                pii_blocked = True
+                                pii_reasons.append(f"pii_blocked:{pii_type}")
+                            elif action in ['mask', 'redact']:
+                                pii_reasons.append(f"pii_{action}:{pii_type}")
+                            else:
+                                pii_reasons.append(f"pii_detected:{pii_type}")
+    
+    # If PII is blocked, override policy decision
+    if pii_blocked:
+        policy_allowed = False
+        policy_reasons.extend(pii_reasons)
 
     # 4) Compute risk score (evidence presence is a simple boolean)
     evidence_present = bool(ev_types)

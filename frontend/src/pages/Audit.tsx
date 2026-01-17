@@ -101,18 +101,18 @@ const AuditPage: React.FC = () => {
             <input id="limit" type="number" min={1} max={200} className="form-control" value={limit} onChange={(e) => setLimit(Number(e.target.value))} />
           </div>
           <div className="col-sm-3">
-            <button className="btn btn-primary" disabled={loading}>{loading ? 'Loading…' : 'Load Requests'}</button>
+            <button className="btn btn-primary" disabled={loading}>{loading ? 'Loading…' : 'Load Decision Logs'}</button>
           </div>
         </form>
       </section>
 
       <section className="mb-4">
         <div className="d-flex justify-content-between align-items-center mb-2">
-          <h5 className="mb-0">Requests</h5>
+          <h5 className="mb-0">Decision Logs</h5>
           <small className="text-muted">Total: {total}</small>
         </div>
         {list.length === 0 ? (
-          <div className="text-muted">No requests loaded. Use the form above.</div>
+          <div className="text-muted">No decision logs loaded. Use the form above.</div>
         ) : (
           <div className="table-responsive">
             <table className="table table-sm align-middle">
@@ -120,6 +120,8 @@ const AuditPage: React.FC = () => {
                 <tr>
                   <th>Request ID</th>
                   <th>Tenant</th>
+                  <th>Stage</th>
+                  <th>Input Preview</th>
                   <th>Decision</th>
                   <th>Risk</th>
                   <th>Created</th>
@@ -131,6 +133,20 @@ const AuditPage: React.FC = () => {
                   <tr key={r.request_log_id}>
                     <td>{r.request_log_id}</td>
                     <td>{r.tenant_id}</td>
+                    <td>
+                      {r.stage === 'pre' ? (
+                        <span className="badge bg-info">Pre-check</span>
+                      ) : r.stage === 'post' ? (
+                        <span className="badge bg-warning">Post-check</span>
+                      ) : (
+                        <span className="badge bg-secondary">—</span>
+                      )}
+                    </td>
+                    <td>
+                      <small className="text-muted" style={{ maxWidth: '200px', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {r.input_text_preview || '—'}
+                      </small>
+                    </td>
                     <td>
                       {r.decision === undefined || r.decision === null ? (
                         <span className="badge bg-secondary">n/a</span>
@@ -198,10 +214,33 @@ const AuditPage: React.FC = () => {
                     <span className="badge bg-danger">deny</span>
                   )}
                 </div>
+                <div className="col-sm-3">
+                  <strong>Stage:</strong>{' '}
+                  {detail.stage === 'pre' ? (
+                    <span className="badge bg-info">Pre-check</span>
+                  ) : detail.stage === 'post' ? (
+                    <span className="badge bg-warning">Post-check</span>
+                  ) : (
+                    <span className="badge bg-secondary">—</span>
+                  )}
+                </div>
                 <div className="col-sm-3"><strong>Policy ID:</strong> {detail.policy_id ?? '—'}</div>
                 <div className="col-sm-3"><strong>Version ID:</strong> {detail.policy_version_id ?? '—'}</div>
-                <div className="col-sm-3"><strong>Created:</strong> {fmt(detail.created_at)}</div>
               </div>
+              <div className="row mb-2">
+                <div className="col-sm-6"><strong>Correlation ID:</strong> <code>{detail.correlation_id ?? '—'}</code></div>
+                <div className="col-sm-6"><strong>Created:</strong> {fmt(detail.created_at)}</div>
+              </div>
+              {detail.input_text && (
+                <div className="row mb-3">
+                  <div className="col-12">
+                    <strong>Input Text:</strong>
+                    <div className="mt-1 p-2 bg-light border rounded">
+                      <pre style={{ whiteSpace: 'pre-wrap', margin: 0, fontSize: '0.875rem' }}>{detail.input_text}</pre>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="row">
                 <div className="col-md-6">
