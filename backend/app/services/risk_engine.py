@@ -31,7 +31,7 @@ from app.core.patterns import (
 
 def _local_intent_classifier(text: str) -> Dict[str, float]:
     """
-    Lightweight heuristic intent classifier.
+    Pattern-based intent classifier.
     Returns mapping label -> score in [0,1].
     Labels: weapon_instruction, incite_violence, depict_violence
     """

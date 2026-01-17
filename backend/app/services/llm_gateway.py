@@ -15,7 +15,7 @@ Read via app.core.config.get_settings() with environment fallbacks:
 
 Ollama:
 - settings.ollama_base_url or env OLLAMA_BASE_URL (default: http://localhost:11434)
-- settings.ollama_model or env OLLAMA_MODEL (default: llama3.1)
+- settings.ollama_model or env OLLAMA_MODEL (default: llama3.2)
 
 OpenAI:
 - settings.openai_api_key or env OPENAI_API_KEY (required)
@@ -78,7 +78,7 @@ class OllamaLLMClient:
             model
             or getattr(settings, "ollama_model", None)
             or os.getenv("OLLAMA_MODEL")
-            or "llama3.1"
+            or "llama3.2"
         )
         self.timeout = float(timeout)
 
