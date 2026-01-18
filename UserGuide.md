@@ -350,55 +350,258 @@ Or if blocked:
 
 ## How to Provide Evidence (Simple)
 
-Why evidence matters:
-- Your policy can require certain evidence types (for example: url, document, text).
-- If those are missing, the request may be denied or marked higher risk (especially in conservative mode).
+### What is Evidence and Why It Matters
 
-Two easy ways to provide evidence:
+Think of evidence like showing your work in math class. When your AI system gives an answer, you want to prove:
+- **Where the information came from** (like citing sources in a research paper)
+- **What data was used** to generate the response
+- **That the response is grounded in real facts**, not made up
 
-1) Tell the Protect API what kinds of evidence you have
-- In the request body, set evidence_types to a list of tags you can provide.
-- Example: ["url", "document"]. This satisfies policy checks that only look for the presence of these types.
+**Why this matters:**
+- Your policy can require certain types of evidence (for example: url, document, text)
+- If evidence is missing, the request may be blocked or flagged as high-risk
+- For compliance (like EU AI Act), you need to show auditors that your AI's answers are backed by real sources
 
-Example (curl):
+**Important:** Evidence is NOT automatically collected. You must provide it yourself—either through the web dashboard, command-line tools, or by calling the API directly.
+
+---
+
+### Three Ways to Provide Evidence
+
+There are three methods, from simplest to most powerful:
+
+#### **Method 1: Evidence Types (Simplest—Just Tags)**
+
+This is like checking boxes: "I have a URL" or "I have a document." You're just telling the system what **kinds** of evidence you have, without providing the actual content.
+
+**When to use this:**
+- Quick testing
+- Your policy just needs to know evidence exists (not the actual content)
+- You're getting started and want something simple
+
+**Example using the Web Dashboard:**
+
+1. Go to the **Protect** page in the dashboard (http://localhost:5173/protect)
+2. Fill in:
+   - **Policy:** Select your policy from the dropdown
+   - **Input Text:** Type or paste your text (e.g., "What is the capital of France?")
+3. Scroll down to **Advanced Options** and click to expand
+4. In the **Evidence Types (CSV)** field, type: `url,text`
+5. Click **Check Protection**
+
+This tells the system: "I have evidence of type 'url' and 'text' available."
+
+**Example using curl (command-line):**
+
 ```bash
 curl -X POST http://localhost:8000/api/protect \
   -H "Content-Type: application/json" \
   -d '{
     "tenant_id": 1,
     "policy_id": 1,
-    "input_text": "Write a short story about a library.",
-    "evidence_types": ["text"]
+    "input_text": "What is the capital of France?",
+    "evidence_types": ["url", "text"]
   }'
 ```
 
-2) Store actual evidence records (optional but useful for audits)
-- Use the Evidence API to save a piece of evidence (like a URL or document) with optional metadata.
-- Later, you can point back to these records in your own app logic.
+**Example using the Python test script:**
 
-Create evidence (curl):
+```bash
+# Make sure you're in the backend folder
+cd backend
+
+# Activate your environment first
+.\.venv\Scripts\Activate.ps1  # Windows
+# source .venv/bin/activate    # macOS/Linux
+
+# Run with evidence types
+python SampleAppIntegration_v2.py \
+  --mode sandwich \
+  --tenant-id 1 \
+  --policy-id 1 \
+  --prompt "What is the capital of France?" \
+  --evidence-types "url,text"
+```
+
+---
+
+#### **Method 2: Evidence IDs (Reference Pre-Stored Evidence)**
+
+This is like referencing footnotes in a book. You first save evidence records in the database, then later you can reference them by ID number.
+
+**When to use this:**
+- You want to reuse the same evidence multiple times
+- You need to track exactly what documents/sources were used
+- You want a permanent audit trail of your evidence
+
+**Step 1: Create an evidence record**
+
+Using the Evidence API (curl):
 ```bash
 curl -X POST "http://localhost:8000/api/evidence?tenant_id=1" \
   -H "Content-Type: application/json" \
   -d '{
     "evidence_type": "url",
-    "source": "https://example.com/policy",
-    "description": "Official policy page",
-    "content": "Optional raw text used to compute a content hash",
-    "metadata": {"topic": "returns"}
+    "source": "https://en.wikipedia.org/wiki/Paris",
+    "description": "Wikipedia article about Paris",
+    "content": "Paris is the capital and largest city of France.",
+    "metadata": {"topic": "geography", "verified": true}
   }'
 ```
 
-Notes:
-- evidence_types in /api/protect is about “what kind” you provided, not linking to a specific record.
-- If your policy requires certain types (like ["url", "document"]) and you send none, the system will add reasons like "missing_evidence:url" and may deny the request.
-- The dashboard Protect page has an “Evidence Types (CSV)” field; enter values like: url,document
+This returns something like:
+```json
+{
+  "id": 42,
+  "evidence_type": "url",
+  "source": "https://en.wikipedia.org/wiki/Paris",
+  ...
+}
+```
+
+**Step 2: Use the evidence ID when calling Protect**
+
+Now you can reference this evidence by its ID (42):
+
+```bash
+python SampleAppIntegration_v2.py \
+  --mode sandwich \
+  --tenant-id 1 \
+  --policy-id 1 \
+  --prompt "What is the capital of France?" \
+  --evidence-ids "42"
+```
+
+You can reference multiple IDs: `--evidence-ids "42,43,44"`
+
+**Note:** This method requires using the test script—the web dashboard doesn't currently support evidence IDs directly.
+
+---
+
+#### **Method 3: Evidence Payloads (Most Powerful—Inline Sources)**
+
+This is the most complete method. You provide the actual text content AND the source information all at once. This is perfect for:
+- Showing exactly what text was used to generate an answer
+- Providing multiple sources that back up a response
+- RAG (Retrieval-Augmented Generation) systems where you retrieve documents and want to prove what was retrieved
+
+**When to use this:**
+- You're using RAG (retrieving documents from a database)
+- You want to show the exact text snippets used
+- You need complete evidence for compliance audits
+- You want to see "grounded claims" analysis (which parts of the response are supported by evidence)
+
+**Example using the Web Dashboard:**
+
+1. Go to the **Protect** page
+2. Fill in your **Policy** and **Input Text**
+3. Scroll to **Advanced Options** → **Evidence Sources**
+4. Click **Show Evidence Sources**
+5. Click **Add Source**
+6. Fill in:
+   - **Source Text:** The actual content (e.g., "Paris is the capital of France, located on the Seine River.")
+   - **Source URI:** Where it came from (e.g., "https://en.wikipedia.org/wiki/Paris")
+7. Click **Add Source** again if you have more sources
+8. Click **Check Protection**
+
+Now the system will:
+- Check if your response is supported by these sources
+- Show you which claims are grounded (backed by evidence) and which aren't
+- Store the evidence trail for audit purposes
+
+**Example using curl:**
+
+```bash
+curl -X POST http://localhost:8000/api/protect \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tenant_id": 1,
+    "policy_id": 1,
+    "input_text": "What is the capital of France?",
+    "evidence_payloads": [
+      {
+        "text": "Paris is the capital and largest city of France.",
+        "source_uri": "https://en.wikipedia.org/wiki/Paris",
+        "metadata": {"retrieval_score": 0.95}
+      },
+      {
+        "text": "The city of Paris is located on the Seine River in northern France.",
+        "source_uri": "https://britannica.com/place/Paris",
+        "metadata": {"retrieval_score": 0.89}
+      }
+    ]
+  }'
+```
+
+**Example using the Python test script:**
+
+```bash
+python SampleAppIntegration_v2.py \
+  --mode sandwich \
+  --tenant-id 1 \
+  --policy-id 1 \
+  --prompt "What is the capital of France?" \
+  --evidence-source "Paris is the capital of France|https://en.wikipedia.org/wiki/Paris" \
+  --evidence-source "Paris is on the Seine River|https://britannica.com/place/Paris"
+```
+
+The format for `--evidence-source` is: `"actual text content|source URL"`
+
+You can add as many `--evidence-source` arguments as you want—each one adds another piece of evidence.
+
+---
+
+### Viewing Evidence in Audit Logs
+
+After you provide evidence and run a protection check, you can see the evidence in the **Audit** page:
+
+1. Go to **Audit** (http://localhost:5173/audit)
+2. Find your recent decision in the list
+3. Click on it to see the details
+4. Scroll down to the **Evidence Sources** section
+
+You'll see a table showing:
+- **Source #**: The number of each evidence source
+- **URI**: Where it came from (clickable link)
+- **Text Preview**: The first 100 characters of the evidence text
+
+This is your audit trail—proof of what evidence was used to support the AI's response.
+
+---
+
+### Quick Reference Comparison
+
+| Method | Complexity | What You Provide | Use Case |
+|--------|-----------|------------------|----------|
+| **Evidence Types** | Simple | Just tags like "url", "text" | Quick checks, policy compliance testing |
+| **Evidence IDs** | Medium | Reference numbers to pre-stored evidence | Reusable evidence, permanent records |
+| **Evidence Payloads** | Advanced | Full text + source URLs | RAG systems, compliance audits, grounded claims |
+
+---
+
+### Troubleshooting
+
+**"Missing evidence" error:**
+- Check if your policy has `required_evidence_types` set (e.g., `["url"]`)
+- Make sure you're providing matching evidence types
+- Example: If policy requires `["url", "document"]`, provide `--evidence-types "url,document"`
+
+**"Evidence not showing in Audit page:"**
+- Make sure you used **Method 3 (Evidence Payloads)**—only payloads are displayed in the audit UI
+- Evidence types and IDs are stored but not shown in the sources table
+
+**"How do I know what evidence my policy requires?"**
+- Go to the Policies page
+- Click on your policy to see details
+- Look for the `required_evidence_types` field
+- If it's empty (`[]`), no evidence is required
 
 ### Add Evidence via the API
 
 Evidence ingestion is available via the API today. Use the curl examples above to store and fetch evidence.
 
 Tip: When evaluating in Protect, type the matching tags into "Evidence Types (CSV)" (e.g., url,document). This signals to the policy engine that the required kinds of evidence are present.
+
 
 ---
 
@@ -1206,3 +1409,4 @@ The system is ready to protect your AI applications! Start integrating it into y
 ---
 
 **Happy policy management! 🚀**
+

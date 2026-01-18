@@ -6,6 +6,11 @@ export type ProtectPayload = {
   policy_id: number;
   input_text: string;
   evidence_types?: string[];
+  evidence_payloads?: Array<{
+    text: string;
+    source_uri?: string;
+    metadata?: Record<string, any>;
+  }>;
   request_id?: string;
   user_agent?: string;
   client_ip?: string;

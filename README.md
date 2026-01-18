@@ -357,6 +357,47 @@ Evidence
   - GET /api/evidence/{id}?tenant_id=... (fetch)
 - Frontend hook: [frontend/src/hooks/useEvidence.ts](frontend/src/hooks/useEvidence.ts)
 
+**Three ways to provide evidence when calling /api/protect or /api/protect-generate:**
+
+1. **Evidence Types** (simplest - just tags):
+   ```json
+   { "evidence_types": ["url", "text"] }
+   ```
+   Use this when your policy requires evidence types but you only need to signal their presence.
+
+2. **Evidence IDs** (reference pre-stored evidence):
+   ```json
+   { "evidence_ids": [42, 43] }
+   ```
+   First create evidence records via POST /api/evidence, then reference their IDs. Used in SampleAppIntegration_v2.py with `--evidence-ids`.
+
+3. **Evidence Payloads** (most powerful - inline sources):
+   ```json
+   {
+     "evidence_payloads": [
+       {
+         "text": "Paris is the capital of France.",
+         "source_uri": "https://en.wikipedia.org/wiki/Paris",
+         "metadata": {"retrieval_score": 0.95}
+       }
+     ]
+   }
+   ```
+   Provide actual text snippets with sources. Perfect for RAG systems. Used in SampleAppIntegration_v2.py with `--evidence-source "text|uri"`.
+
+**Example command-line usage:**
+```bash
+# Using SampleAppIntegration_v2.py with evidence payloads
+python backend/SampleAppIntegration_v2.py \
+  --mode sandwich \
+  --tenant-id 1 \
+  --policy-id 1 \
+  --prompt "What is the capital of France?" \
+  --evidence-source "Paris is the capital of France|https://en.wikipedia.org/wiki/Paris"
+```
+
+See [UserGuide.md](UserGuide.md#how-to-provide-evidence-simple) for detailed beginner-friendly examples with web UI, curl, and Python.
+
 Audit (list, detail, export)
 - Route: [backend/app/api/routes/audit.py](backend/app/api/routes/audit.py)
 - Endpoints

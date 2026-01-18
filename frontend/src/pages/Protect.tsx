@@ -11,6 +11,10 @@ const Protect: React.FC = () => {
   const [evidenceTypesCsv, setEvidenceTypesCsv] = useState<string>('');
   const [evidenceIdsCsv, setEvidenceIdsCsv] = useState<string>(''); // hidden by default
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  
+  // Evidence sources (for testing evidence display)
+  const [evidenceSources, setEvidenceSources] = useState<Array<{ text: string; source_uri: string }>>([]);
+  const [showEvidenceSources, setShowEvidenceSources] = useState<boolean>(false);
 
   const [submitted, setSubmitted] = useState<boolean>(false);
 
@@ -25,12 +29,18 @@ const Protect: React.FC = () => {
     setSubmitted(true);
 
     const evidence_types = parseCsv(evidenceTypesCsv);
+    
+    // Filter out empty evidence sources
+    const validEvidenceSources = evidenceSources.filter(
+      (s) => s.text.trim() || s.source_uri.trim()
+    );
 
     const payload: ProtectPayload = {
       tenant_id: tenantId,
       policy_id: policyId,
       input_text: inputText,
       evidence_types: evidence_types.length ? evidence_types : undefined,
+      evidence_payloads: validEvidenceSources.length > 0 ? validEvidenceSources : undefined,
       // evidenceIdsCsv is currently not used by the backend route; it’s shown for UI parity
       metadata: evidenceIdsCsv
         ? { evidence_ids: evidenceIdsCsv.split(',').map((s) => s.trim()).filter(Boolean) }
@@ -149,6 +159,76 @@ const Protect: React.FC = () => {
                     <div className="form-text">
                       These IDs will be sent as metadata.evidence_ids and used to infer evidence types.
                     </div>
+                  </div>
+                  
+                  <div className="mb-3">
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <label className="form-label mb-0">Evidence Sources (for testing)</label>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-primary"
+                        onClick={() => setShowEvidenceSources(!showEvidenceSources)}
+                      >
+                        {showEvidenceSources ? 'Hide' : 'Show'} Evidence Sources
+                      </button>
+                    </div>
+                    {showEvidenceSources && (
+                      <div className="border rounded p-3 bg-light">
+                        {evidenceSources.map((source, idx) => (
+                          <div key={idx} className="mb-3 pb-3 border-bottom">
+                            <div className="mb-2">
+                              <label className="form-label small">Source {idx + 1} - Text</label>
+                              <textarea
+                                className="form-control form-control-sm"
+                                rows={2}
+                                value={source.text}
+                                onChange={(e) => {
+                                  const newSources = [...evidenceSources];
+                                  newSources[idx].text = e.target.value;
+                                  setEvidenceSources(newSources);
+                                }}
+                                placeholder="Evidence text content..."
+                              />
+                            </div>
+                            <div className="mb-2">
+                              <label className="form-label small">Source {idx + 1} - URI</label>
+                              <input
+                                type="text"
+                                className="form-control form-control-sm"
+                                value={source.source_uri}
+                                onChange={(e) => {
+                                  const newSources = [...evidenceSources];
+                                  newSources[idx].source_uri = e.target.value;
+                                  setEvidenceSources(newSources);
+                                }}
+                                placeholder="https://example.com/source"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-danger"
+                              onClick={() => {
+                                setEvidenceSources(evidenceSources.filter((_, i) => i !== idx));
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-success"
+                          onClick={() => {
+                            setEvidenceSources([...evidenceSources, { text: '', source_uri: '' }]);
+                          }}
+                        >
+                          + Add Evidence Source
+                        </button>
+                        <div className="form-text mt-2">
+                          Evidence sources will be sent to the backend for testing evidence display in the Audit page.
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
