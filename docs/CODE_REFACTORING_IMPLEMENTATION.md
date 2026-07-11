@@ -1,9 +1,10 @@
 # Code Refactoring Implementation Guide
 
 **Status:** Ready to Execute  
-**Duration:** 2 weeks (80 hours)  
+**Duration:** 3 weeks (120 hours) - *Extended to address code hygiene standards*  
 **Target Branch:** `claude/code-structure-review-eprtuy`  
-**Prerequisite:** Read `REFACTORING_PLAN.md` first
+**Prerequisite:** Read `REFACTORING_PLAN.md` and `REFACTORING_VS_QUALITY_STANDARDS.md` first  
+**Standards Reference:** Master Engineering Context Pack v3 (CODE_QUALITY_CHECKER, HYGIENE_ENFORCER)
 
 ---
 
@@ -12,9 +13,10 @@
 1. [Quick Start](#quick-start)
 2. [Week 1: Extract Large Functions](#week-1-extract-large-functions)
 3. [Week 2: Flatten Nesting & Add Tests](#week-2-flatten-nesting--add-tests)
-4. [Testing & Validation](#testing--validation)
-5. [Common Patterns & Recipes](#common-patterns--recipes)
-6. [Rollback Strategy](#rollback-strategy)
+4. [Week 3: Hygiene Standards & Code Quality (NEW)](#week-3-hygiene-standards--code-quality-new)
+5. [Testing & Validation](#testing--validation)
+6. [Common Patterns & Recipes](#common-patterns--recipes)
+7. [Rollback Strategy](#rollback-strategy)
 
 ---
 
@@ -32,12 +34,20 @@ pytest backend/tests/ --cov=backend/app --cov-report=json -q
 ```
 
 ### Main Tasks (In Order)
+**WEEK 1-2: Code Structure (80 hours)**
 1. **Week 1, Day 1-2:** Extract `decision_service.protect()` (205 lines → 50 lines)
 2. **Week 1, Day 3-4:** Extract `protect_endpoint()` (138 lines → 30 lines)
 3. **Week 1, Day 5:** Extract `governed_generation_service.protect_and_generate()` (208 lines → 50 lines)
 4. **Week 2, Day 1-2:** Flatten nesting in `decision_service.py` and `compliance_renderers.py`
 5. **Week 2, Day 3-4:** Add unit tests + linting
 6. **Week 2, Day 5:** Final validation + metrics comparison
+
+**WEEK 3: Code Hygiene & Standards (40 hours) - NEW**
+7. **Week 3, Day 1:** Class size audit + type hints enforcement
+8. **Week 3, Day 2:** Code duplication detection & elimination
+9. **Week 3, Day 3:** Naming conventions standardization
+10. **Week 3, Day 4:** Import organization + comment style validation
+11. **Week 3, Day 5:** File size audit + final verification
 
 ---
 
@@ -845,6 +855,709 @@ pytest backend/tests/test_refactored_functions.py -v --cov=backend/app/services
 
 ---
 
+## Week 3: Hygiene Standards & Code Quality (NEW)
+
+*Addresses gaps from REFACTORING_VS_QUALITY_STANDARDS.md analysis*
+
+### Task 3.1: Type Hints Enforcement
+
+**Duration:** 1 day (8 hours)  
+**Standard:** HYGIENE_ENFORCER - All public functions must have type hints
+
+#### Step 1: Install type checking tools
+
+```bash
+pip install mypy pylint pyright
+```
+
+#### Step 2: Configure MyPy
+
+Create `backend/pyproject.toml`:
+
+```toml
+[tool.mypy]
+python_version = "3.12"
+strict = true
+disallow_untyped_defs = true
+warn_return_any = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+exclude = ["build/", "dist/"]
+```
+
+#### Step 3: Add type hints to key services
+
+**File:** `backend/app/services/decision_service.py`
+
+```python
+from typing import Optional, List, Dict, Any
+from datetime import datetime
+
+class DecisionService:
+    """Service for making policy decisions."""
+    
+    def protect(
+        self, 
+        input_text: str, 
+        policy_id: Optional[int] = None,
+        evidence_ids: Optional[List[int]] = None,
+        tenant_id: Optional[int] = None
+    ) -> ProtectResponse:
+        """Orchestrate all protection checks."""
+        # Implementation...
+    
+    def _log_request(
+        self, 
+        input_text: str, 
+        policy_id: Optional[int],
+        tenant_id: Optional[int],
+        evidence_ids: Optional[List[int]]
+    ) -> RequestLog:
+        """Log incoming request."""
+        # Implementation...
+    
+    def _load_policy(
+        self, 
+        policy_id: Optional[int],
+        tenant_id: Optional[int],
+        request_log: RequestLog
+    ) -> Policy:
+        """Load policy, fallback to default."""
+        # Implementation...
+    
+    def _check_pii_rules(
+        self, 
+        text: str, 
+        policy: Policy
+    ) -> List[PiiViolation]:
+        """Check PII violations."""
+        # Implementation...
+    
+    def _find_matching_rule(
+        self, 
+        marker: str, 
+        rules: Dict[str, Any]
+    ) -> Optional[str]:
+        """Find first matching rule key."""
+        # Implementation...
+    
+    def _compute_risk(
+        self, 
+        text: str, 
+        policy: Policy,
+        evidence_ids: Optional[List[int]]
+    ) -> RiskScore:
+        """Compute risk score."""
+        # Implementation...
+    
+    def _make_decision(
+        self, 
+        policy: Policy, 
+        risk: RiskScore,
+        violations: List[PiiViolation]
+    ) -> Decision:
+        """Make allow/block decision."""
+        # Implementation...
+    
+    def _log_decision(
+        self, 
+        request_log: RequestLog, 
+        policy: Policy,
+        risk: RiskScore,
+        violations: List[PiiViolation],
+        decision: Decision
+    ) -> DecisionLog:
+        """Log decision to audit trail."""
+        # Implementation...
+```
+
+**File:** `backend/app/services/governed_generation_service.py`
+
+```python
+from typing import Optional, Dict, Any
+
+class GovernedGenerationService:
+    """Service for LLM generation with governance."""
+    
+    def protect_and_generate(
+        self, 
+        payload: ProtectAndGenerateRequest
+    ) -> ProtectAndGenerateResponse:
+        """Generate text with protection and governance."""
+        # Implementation...
+    
+    def _pre_check_policy(
+        self, 
+        input_text: str, 
+        policy: Policy
+    ) -> PreCheckResult:
+        """Run pre-generation policy check."""
+        # Implementation...
+    
+    def _generate_with_rag(
+        self, 
+        input_text: str,
+        llm_config: Dict[str, Any],
+        context_data: Optional[Dict[str, Any]]
+    ) -> str:
+        """Generate text with RAG context."""
+        # Implementation...
+    
+    def _evaluate_safety(
+        self, 
+        text: str, 
+        policy: Policy
+    ) -> SafetyReport:
+        """Evaluate response safety."""
+        # Implementation...
+    
+    def _evaluate_groundedness(
+        self, 
+        response: str, 
+        context: Optional[Dict[str, Any]]
+    ) -> GroundednessScore:
+        """Evaluate response groundedness."""
+        # Implementation...
+```
+
+#### Step 4: Validate type hints
+
+```bash
+# Check type hints
+mypy backend/app/services/ --strict
+
+# Expected: Zero errors
+```
+
+**Success Criteria:**
+- All public functions have return type annotations
+- All parameters have type hints
+- MyPy strict mode passes with zero errors
+
+---
+
+### Task 3.2: Class Size Audit
+
+**Duration:** 1 day (8 hours)  
+**Standard:** CODE_QUALITY_CHECKER - Classes SHOULD be ≤500 lines, MUST be ≤1000 lines
+
+#### Step 1: Audit class sizes
+
+```bash
+# Check class sizes
+wc -l backend/app/services/*.py | sort -rn
+
+# Find classes >500 lines
+grep -n "^class " backend/app/services/*.py | while read line; do
+  file=$(echo "$line" | cut -d: -f1)
+  line_num=$(echo "$line" | cut -d: -f2)
+  # Calculate size
+done
+```
+
+#### Step 2: Plan refactoring for large classes
+
+Classes typically exceeding 500 lines:
+- `DecisionService` (if grown beyond extraction)
+- `ComplianceReportService` (if consolidating reports)
+
+**Strategy:** Extract domain concerns into separate services
+
+```python
+# EXAMPLE: Split ComplianceReportService
+
+# Before: ComplianceReportService (800+ lines)
+#   - EU AI Act report generation
+#   - NIST AI RMF report generation
+#   - NIST Privacy report generation
+#   - CSV/HTML rendering
+
+# After: Split into 4 services
+class EUAIActReportService:
+    """Generate EU AI Act compliance reports."""
+    
+class NISTAIRMFReportService:
+    """Generate NIST AI RMF compliance reports."""
+    
+class NISTPrivacyReportService:
+    """Generate NIST Privacy compliance reports."""
+    
+class ComplianceReportRenderer:
+    """Render compliance reports to CSV/HTML/JSON."""
+```
+
+#### Step 3: Execute refactoring (if needed)
+
+If any class > 500 lines, split following this pattern:
+- Extract each framework into separate service
+- Move rendering to dedicated renderer class
+- Keep factory pattern if needed
+
+**Verification:**
+
+```bash
+# Verify all classes < 500 lines
+for file in backend/app/services/*.py; do
+  lines=$(wc -l < "$file")
+  if [ "$lines" -gt 500 ]; then
+    echo "WARNING: $file is $lines lines"
+  fi
+done
+```
+
+**Success Criteria:**
+- All classes ≤500 lines (SHOULD)
+- All classes ≤1000 lines (MUST)
+- Clear separation of concerns per service
+
+---
+
+### Task 3.3: Code Duplication Detection & Elimination
+
+**Duration:** 1 day (8 hours)  
+**Standard:** HYGIENE_ENFORCER - Eliminate duplicates after 3rd occurrence
+
+#### Step 1: Install and run duplication detector
+
+```bash
+pip install pylint-json2html
+
+# Run duplication detection
+pylint --disable=all --enable=duplicate-code backend/app/services/ > duplication_report.txt
+```
+
+#### Step 2: Identify common patterns
+
+Expected duplications:
+- Validation patterns (email, URL, text length)
+- Logging patterns (request/response logging)
+- Error handling patterns
+- Type conversion utilities
+
+#### Step 3: Extract duplicates to shared modules
+
+**Example Pattern 1: Validation**
+
+```python
+# backend/app/utils/validators.py
+from typing import Optional
+
+class TextValidator:
+    """Centralized text validation."""
+    
+    @staticmethod
+    def validate_email(email: str) -> bool:
+        """Validate email format."""
+        import re
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        return bool(re.match(pattern, email))
+    
+    @staticmethod
+    def validate_text_length(
+        text: str, 
+        min_length: int = 1, 
+        max_length: int = 10000
+    ) -> bool:
+        """Validate text length."""
+        return min_length <= len(text) <= max_length
+    
+    @staticmethod
+    def validate_url(url: str) -> bool:
+        """Validate URL format."""
+        from urllib.parse import urlparse
+        try:
+            result = urlparse(url)
+            return all([result.scheme, result.netloc])
+        except Exception:
+            return False
+
+# Usage (replaces inline validations):
+from app.utils.validators import TextValidator
+
+if not TextValidator.validate_email(user_email):
+    raise ValueError("Invalid email")
+```
+
+**Example Pattern 2: Logging**
+
+```python
+# backend/app/utils/logging.py
+from typing import Optional, Dict, Any
+
+class AuditLogger:
+    """Centralized audit logging."""
+    
+    def __init__(self, audit_repo):
+        self.audit_repo = audit_repo
+    
+    def log_action(
+        self,
+        tenant_id: int,
+        agent_id: str,
+        action: str,
+        resource_id: Optional[int] = None,
+        details: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """Log an action to audit trail."""
+        self.audit_repo.log_request(
+            tenant_id=tenant_id,
+            agent_id=agent_id,
+            action=action,
+            resource_id=resource_id,
+            details=details
+        )
+
+# Usage (replaces copy-paste logging):
+logger = AuditLogger(audit_repo)
+logger.log_action(
+    tenant_id=tenant_id,
+    agent_id=agent_id,
+    action="create_policy",
+    resource_id=policy.id
+)
+```
+
+#### Step 4: Verify duplication eliminated
+
+```bash
+# Re-run detection
+pylint --disable=all --enable=duplicate-code backend/app/services/ > duplication_report_after.txt
+
+# Compare
+diff duplication_report.txt duplication_report_after.txt
+```
+
+**Success Criteria:**
+- Zero duplicate code patterns found
+- All common utilities extracted to `backend/app/utils/`
+- All services use centralized validators/loggers
+
+---
+
+### Task 3.4: Naming Convention Standardization
+
+**Duration:** 1 day (8 hours)  
+**Standard:** HYGIENE_ENFORCER - Consistent naming (PascalCase/camelCase/UPPER_SNAKE_CASE)
+
+#### Step 1: Configure linting for naming
+
+```bash
+pip install flake8 pep8-naming
+```
+
+Create `.flake8` or `setup.cfg`:
+
+```ini
+[flake8]
+select = N  # Enable naming checks
+ignore = E501,W503
+exclude = venv,build,dist,tests
+max-line-length = 120
+```
+
+#### Step 2: Run naming audit
+
+```bash
+# Check naming conventions
+flake8 backend/app/services/ --select=N
+
+# Expected issues to fix:
+# N802: function name should be lowercase
+# N806: variable name should be lowercase
+# N815: variable name should be lowercase
+# N999: module name is invalid
+```
+
+#### Step 3: Fix naming issues
+
+**Python Naming Conventions:**
+- Classes: `PascalCase` (e.g., `DecisionService`)
+- Functions/methods: `snake_case` (e.g., `compute_risk`, `_check_pii_rules`)
+- Constants: `UPPER_SNAKE_CASE` (e.g., `MAX_TEXT_LENGTH`, `PII_RULES`)
+- Private: `_leading_underscore` (e.g., `_internal_helper`)
+- Protected: `_leading_underscore` (same as private in Python)
+
+**Example fixes:**
+
+```python
+# ❌ BEFORE: Inconsistent naming
+class decision_service:  # Wrong: should be PascalCase
+    MAX_text = 10000  # Wrong: should be UPPER_SNAKE_CASE
+    def Protect():  # Wrong: should be snake_case
+        RiskLevel = "high"  # Wrong: should be UPPER_SNAKE_CASE
+        return riskLevel  # Wrong: inconsistent
+
+# ✅ AFTER: Consistent naming
+class DecisionService:  # Correct: PascalCase
+    MAX_TEXT_LENGTH = 10000  # Correct: UPPER_SNAKE_CASE
+    def protect(self):  # Correct: snake_case
+        RISK_LEVEL = "high"  # Correct: UPPER_SNAKE_CASE
+        return RISK_LEVEL  # Correct: consistent
+```
+
+#### Step 4: Verify naming conventions
+
+```bash
+# Final check
+flake8 backend/app/services/ --select=N
+
+# Expected: Zero naming violations
+```
+
+**Success Criteria:**
+- All classes use PascalCase
+- All functions/methods use snake_case
+- All constants use UPPER_SNAKE_CASE
+- All private methods use `_leading_underscore`
+- Flake8 reports zero naming issues
+
+---
+
+### Task 3.5: Import Organization & File Size
+
+**Duration:** 1 day (8 hours)  
+**Standard:** HYGIENE_ENFORCER - Imports organized; CODE_QUALITY_CHECKER - Files ≤500 lines
+
+#### Step 1: Install import organizer
+
+```bash
+pip install isort
+```
+
+#### Step 2: Configure isort
+
+Create `backend/pyproject.toml` (add to existing):
+
+```toml
+[tool.isort]
+profile = "black"
+line_length = 120
+multi_line_mode = 3  # Vertical hanging indent
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+
+# Import order: future, stdlib, third-party, first-party, local
+known_first_party = ["app"]
+known_local_folder = ["app"]
+```
+
+#### Step 3: Apply isort to all files
+
+```bash
+# Organize all imports
+isort backend/app/ --recursive
+
+# Verify organization
+isort backend/app/ --recursive --check-only --diff
+```
+
+#### Step 4: Audit file sizes
+
+```bash
+# Find files > 500 lines
+find backend/app -name "*.py" -exec wc -l {} + | awk '$1 > 500 {print}'
+```
+
+**Strategy for large files:**
+- Split by concern (separate classes to separate files)
+- Use subdirectories: `services/` vs `repos/` vs `models/`
+- Max 400 lines per file is ideal
+
+**Example File Structure:**
+```
+backend/app/
+├── services/
+│   ├── __init__.py
+│   ├── decision_service.py       (250 lines)
+│   ├── generation_service.py     (180 lines)
+│   ├── compliance_service.py     (220 lines)
+│   └── reports/
+│       ├── __init__.py
+│       ├── eu_ai_act.py         (150 lines)
+│       ├── nist_ai_rmf.py       (150 lines)
+│       └── renderer.py          (180 lines)
+└── repos/
+    ├── __init__.py
+    ├── policy_repo.py           (200 lines)
+    ├── audit_repo.py            (180 lines)
+    └── evidence_repo.py         (150 lines)
+```
+
+#### Step 5: Validate files and imports
+
+```bash
+# Check all files < 500 lines
+find backend/app -name "*.py" -exec sh -c 'lines=$(wc -l < "$1"); if [ "$lines" -gt 500 ]; then echo "$1: $lines lines"; fi' _ {} \;
+
+# Verify imports organized
+isort backend/app/ --check-only
+```
+
+**Success Criteria:**
+- All files ≤500 lines (SHOULD)
+- Imports organized: external → internal → relative
+- All imports sorted alphabetically within groups
+- No circular imports
+
+---
+
+### Task 3.6: Comment Style Validation
+
+**Duration:** 0.5 days (4 hours)  
+**Standard:** HYGIENE_ENFORCER - Comments explain WHY, not WHAT
+
+#### Step 1: Comment audit
+
+Run through code and identify comments that describe WHAT (obvious code):
+
+```python
+# ❌ BAD: Explains WHAT (obvious)
+# Increment counter
+counter += 1
+
+# ❌ BAD: Explains obvious code
+# Create a new list
+results = []
+
+# ❌ BAD: Describes code structure
+# Loop through users
+for user in users:
+    # Check if user is active
+    if user.is_active:
+        # Add to results
+        results.append(user)
+```
+
+#### Step 2: Rewrite to explain WHY
+
+```python
+# ✅ GOOD: Explains WHY (non-obvious)
+# Skip header row when processing CSV
+counter += 1
+
+# ✅ GOOD: Explains business logic
+# Only include active users for billing calculations
+results = []
+
+# ✅ GOOD: Clear separation by business step
+# Only include active users in billing report (excludes trial accounts)
+for user in users:
+    if user.is_active:
+        results.append(user)
+
+# ✅ GOOD: Explains non-obvious decision
+# Use exponential backoff to avoid rate limiting
+retry_delay = initial_delay * (2 ** attempt)
+
+# ✅ GOOD: Explains why empty, not just that it's empty
+# Default to empty list if no evidence provided (caller may not have any)
+evidence_items = []
+```
+
+#### Step 3: Apply comment rules
+
+**Guidelines:**
+1. Delete obvious comments (code is self-documenting)
+2. Add comments for non-obvious decisions
+3. Explain WHY, not WHAT
+4. Add comments for workarounds/hacks (explain limitation)
+5. Add comments for subtle invariants (explain constraint)
+
+#### Step 4: Verify comment quality
+
+Manual code review:
+- Read function comments
+- Do they explain business logic or just repeat code?
+- Are workarounds documented?
+- Are assumptions stated?
+
+**Success Criteria:**
+- No obvious comments remaining
+- All non-obvious logic explained
+- All workarounds documented
+- Comments answer "WHY", not "WHAT"
+
+---
+
+### Task 3.7: Final Verification
+
+**Duration:** 1 day (8 hours)  
+**Validation:** All 12 code quality standards
+
+```bash
+# Run comprehensive quality checks
+#!/bin/bash
+set -e
+
+echo "=== Code Quality Verification ==="
+
+# 1. Type hints
+echo "1. Checking type hints..."
+mypy backend/app/services/ --strict
+
+# 2. Function size
+echo "2. Checking function sizes..."
+radon cc backend/app/services/ -a | grep -E "([6-9]|[0-9]{2,})" && echo "WARNING: High complexity detected" || echo "✓ Function complexity OK"
+
+# 3. Nesting depth
+echo "3. Checking nesting depth..."
+grep -r "^        " backend/app/services/ && echo "WARNING: Deep nesting detected" || echo "✓ Nesting depth OK"
+
+# 4. Class sizes
+echo "4. Checking class sizes..."
+for file in backend/app/services/*.py; do
+    lines=$(wc -l < "$file")
+    if [ "$lines" -gt 500 ]; then
+        echo "WARNING: $file is $lines lines (>500)"
+    fi
+done
+
+# 5. Duplication
+echo "5. Checking code duplication..."
+pylint --disable=all --enable=duplicate-code backend/app/services/ 2>/dev/null || echo "✓ No duplicates detected"
+
+# 6. Naming conventions
+echo "6. Checking naming conventions..."
+flake8 backend/app/services/ --select=N || echo "✓ Naming OK"
+
+# 7. Imports
+echo "7. Checking import organization..."
+isort backend/app/ --check-only || echo "WARNING: Imports need organizing"
+
+# 8. Tests
+echo "8. Running tests..."
+pytest backend/tests/ -q --tb=short
+
+# 9. Coverage
+echo "9. Checking coverage..."
+pytest backend/tests/ --cov=backend/app --cov-report=term-missing --cov-report=html
+
+# 10. Linting
+echo "10. Running linting..."
+pylint backend/app/services/ --exit-zero
+
+echo "=== Verification Complete ==="
+```
+
+**Expected Results:**
+
+| Check | Status | Criteria |
+|-------|--------|----------|
+| Type hints | ✅ | MyPy strict: 0 errors |
+| Function size | ✅ | All ≤50 lines |
+| Nesting depth | ✅ | Max 2-3 levels |
+| Class size | ✅ | All ≤500 lines |
+| Duplication | ✅ | Zero 3+ patterns |
+| Naming | ✅ | Flake8 N checks: 0 errors |
+| Imports | ✅ | isort: 0 changes needed |
+| Unit tests | ✅ | 100% pass |
+| Coverage | ✅ | >85% |
+| Linting | ✅ | <10 warnings |
+
+---
+
 ## Testing & Validation
 
 ### Comprehensive Testing Strategy
@@ -992,13 +1705,52 @@ git reset --hard origin/claude/code-structure-review-eprtuy
 
 ## Completion Checklist
 
-- [ ] All functions extracted (< 50 lines each)
-- [ ] All nesting flattened (max depth = 2)
+### Phase 1-2: Code Structure (Weeks 1-2)
+- [ ] Task 1.1: `decision_service.protect()` extracted (10 + 7 helpers)
+- [ ] Task 1.2: `protect_endpoint()` extracted (5 + 4 helpers)
+- [ ] Task 1.3: `protect_and_generate()` extracted (50 + 6 helpers)
+- [ ] Task 2.1: `_check_pii_rules()` nesting flattened
+- [ ] Task 2.2: `compliance_renderers.py` nesting flattened (6 → 2 levels)
+- [ ] Task 2.3: Unit tests created (15+ test cases, >80% coverage)
+- [ ] Metrics comparison: before/after collected
+
+### Phase 3: Code Hygiene & Standards (Week 3)
+- [ ] Task 3.1: Type hints added to all public functions
+  - [ ] MyPy strict mode: 0 errors
+  - [ ] All function signatures annotated
+  - [ ] All return types annotated
+- [ ] Task 3.2: Class size audit completed
+  - [ ] All classes ≤500 lines (SHOULD)
+  - [ ] All classes ≤1000 lines (MUST)
+  - [ ] Large classes refactored if needed
+- [ ] Task 3.3: Code duplication eliminated
+  - [ ] Duplication scan: 0 patterns
+  - [ ] Common utilities extracted to `utils/`
+  - [ ] Validators/loggers centralized
+- [ ] Task 3.4: Naming conventions standardized
+  - [ ] Classes: PascalCase
+  - [ ] Functions: snake_case
+  - [ ] Constants: UPPER_SNAKE_CASE
+  - [ ] Flake8 naming checks: 0 errors
+- [ ] Task 3.5: Import organization & file sizes
+  - [ ] All imports organized (external → internal → relative)
+  - [ ] All files ≤500 lines
+  - [ ] isort check-only: 0 changes needed
+- [ ] Task 3.6: Comment style validation
+  - [ ] No obvious comments remaining
+  - [ ] All non-obvious logic documented
+  - [ ] Comments explain WHY, not WHAT
+
+### Final Validation
+- [ ] All functions < 50 lines (SHOULD), < 400 lines (MUST)
+- [ ] All nesting flattened (max depth = 2-3 levels)
 - [ ] All unit tests pass (pytest)
-- [ ] Type hints verified (mypy)
-- [ ] Code linted (ruff, pylint)
-- [ ] Coverage > 80% (pytest --cov)
+- [ ] Type hints verified (mypy --strict)
+- [ ] Code linted (flake8, pylint)
+- [ ] Coverage > 85% (pytest --cov)
 - [ ] Cyclomatic complexity < 5
+- [ ] No code duplication patterns
+- [ ] Naming conventions consistent
 - [ ] All tests pass without warnings
 - [ ] Metrics compared (before vs after)
 - [ ] Code review completed
@@ -1006,10 +1758,43 @@ git reset --hard origin/claude/code-structure-review-eprtuy
 
 ---
 
+## Timeline Summary
+
+| Phase | Duration | Focus | Deliverable |
+|-------|----------|-------|-------------|
+| Phase 1-2 | 2 weeks (80 hrs) | Code structure | Extracted functions, flattened nesting, unit tests |
+| Phase 3 | 1 week (40 hrs) | Code hygiene | Type hints, naming, duplication, organization |
+| **Total** | **3 weeks (120 hrs)** | **Complete refactoring** | **100% standards compliance** |
+
+---
+
+## Standards Coverage
+
+This extended plan addresses all 12 aspects from Master Engineering Context Pack:
+
+| Standard | Aspect | Phase | Status |
+|----------|--------|-------|--------|
+| CODE_QUALITY_CHECKER | Function size | 1-2 | ✅ |
+| CODE_QUALITY_CHECKER | File size | 3 | ✅ |
+| CODE_QUALITY_CHECKER | Class size | 3 | ✅ |
+| CODE_QUALITY_CHECKER | Cyclomatic complexity | 1-2 | ✅ |
+| CODE_QUALITY_CHECKER | Nesting depth | 1-2 | ✅ |
+| HYGIENE_ENFORCER | Single responsibility | 1-2 | ✅ |
+| HYGIENE_ENFORCER | Type hints | 3 | ✅ |
+| HYGIENE_ENFORCER | Code duplication | 3 | ✅ |
+| HYGIENE_ENFORCER | Naming conventions | 3 | ✅ |
+| HYGIENE_ENFORCER | Comment style | 3 | ✅ |
+| HYGIENE_ENFORCER | Import organization | 3 | ✅ |
+| General | Testing & coverage | 1-2 | ✅ |
+
+---
+
 ## Next Steps After Refactoring
 
-1. ✅ Complete this refactoring guide
-2. ⏭️ Start MCP Server Implementation (next document)
-3. ⏭️ Create MCP Client Library
-4. ⏭️ Integration tests (MCP + refactored code)
+1. ✅ **Week 1-2:** Complete Phase 1-2 (code structure)
+2. ✅ **Week 3:** Complete Phase 3 (code hygiene)
+3. ⏭️ Start MCP Server Implementation (next document)
+4. ⏭️ Create MCP Client Library
+5. ⏭️ Integration tests (MCP + refactored code)
+6. ⏭️ Production deployment
 
